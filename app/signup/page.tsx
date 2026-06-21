@@ -22,10 +22,10 @@ export default function SignUpPage() {
     setError(null);
     setLoading(true);
     await authClient.signUp.email(
-      { email, password, name, username, callbackURL: "/profile" },
+      { email, password, name, username, callbackURL: "/dashboard" },
       {
         onRequest: () => setLoading(true),
-        onSuccess: () => { setLoading(false); router.push("/profile"); router.refresh(); },
+        onSuccess: () => { setLoading(false); router.push("/dashboard"); router.refresh(); },
         onError: (ctx) => { setLoading(false); setError(ctx.error.message || "Failed to create account."); },
       }
     );

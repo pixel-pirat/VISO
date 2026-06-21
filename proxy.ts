@@ -34,7 +34,7 @@ export default function proxy(request: NextRequest) {
     pathname.startsWith("/login") || pathname.startsWith("/signup");
 
   if (isAuthPage && isAuthenticated) {
-    return NextResponse.redirect(new URL("/profile", request.url));
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();

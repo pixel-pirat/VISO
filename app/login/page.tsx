@@ -20,10 +20,10 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     await authClient.signIn.email(
-      { email, password, callbackURL: "/profile" },
+      { email, password, callbackURL: "/dashboard" },
       {
         onRequest: () => setLoading(true),
-        onSuccess: () => { setLoading(false); router.push("/profile"); router.refresh(); },
+        onSuccess: () => { setLoading(false); router.push("/dashboard"); router.refresh(); },
         onError: (ctx) => { setLoading(false); setError(ctx.error.message || "Invalid credentials."); },
       }
     );
