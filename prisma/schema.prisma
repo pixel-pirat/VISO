@@ -1,0 +1,277 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  ONLINE
+  OFFLINE
+  IDLE
+  DO_NOT_DISTURB
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  BLOCKED
+}
+
+enum RoomVisibility {
+  PUBLIC
+  PRIVATE
+  UNLISTED
+}
+
+enum RoomRole {
+  HOST
+  CO_HOST
+  MODERATOR
+  VIEWER
+}
+
+enum ContentType {
+  YOUTUBE
+  TWITCH
+  HLS
+  DASH
+  MP4
+  LIVEKIT
+}
+
+enum RoomContentStatus {
+  QUEUED
+  PLAYING
+  PLAYED
+  SKIPPED
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+  EMOJI
+  CONTENT_SHARE
+}
+
+enum NotificationType {
+  FRIEND_REQUEST
+  ROOM_INVITE
+  PLAYBACK_STARTED
+  CHAT_MENTION
+  SYSTEM
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String     @unique
+  username     String     @unique
+  passwordHash String
+  displayName  String?
+  avatarUrl    String?
+  status       UserStatus @default(OFFLINE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+
+  // Relations
+  sentFriendships     Friendship[]        @relation("SentFriendships")
+  receivedFriendships Friendship[]        @relation("ReceivedFriendships")
+  memberships         RoomMember[]
+  hostedRooms         Room[]              @relation("HostedRooms")
+  addedContent        Content[]           @relation("AddedContent")
+  addedRoomContent    RoomContent[]       @relation("AddedRoomContent")
+  messages            Message[]
+  notifications       Notification[]
+  updatedPlaybacks    RoomPlaybackState[] @relation("UpdatedPlaybacks")
+
+  @@index([email])
+  @@index([username])
+  @@index([deletedAt])
+}
+
+model Friendship {
+  id          String           @id @default(uuid()) @db.Uuid
+  requesterId String           @db.Uuid
+  addresseeId String           @db.Uuid
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  requester User @relation("SentFriendships", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("ReceivedFriendships", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([requesterId])
+  @@index([addresseeId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model Room {
+  id          String         @id @default(uuid()) @db.Uuid
+  name        String
+  slug        String         @unique
+  description String?
+  hostId      String         @db.Uuid
+  visibility  RoomVisibility @default(PUBLIC)
+  passcode    String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  host          User               @relation("HostedRooms", fields: [hostId], references: [id], onDelete: Cascade)
+  members       RoomMember[]
+  roomContents  RoomContent[]
+  playbackState RoomPlaybackState?
+  messages      Message[]
+
+  @@index([hostId])
+  @@index([visibility])
+  @@index([deletedAt])
+}
+
+model RoomMember {
+  id         String    @id @default(uuid()) @db.Uuid
+  roomId     String    @db.Uuid
+  userId     String    @db.Uuid
+  role       RoomRole  @default(VIEWER)
+  joinedAt   DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  isBanned   Boolean   @default(false)
+  isMuted    Boolean   @default(false)
+  deletedAt  DateTime?
+
+  // Relations
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+  @@index([roomId])
+  @@index([userId])
+  @@index([role])
+  @@index([deletedAt])
+}
+
+model Content {
+  id           String      @id @default(uuid()) @db.Uuid
+  title        String
+  url          String
+  type         ContentType
+  duration     Int? // Duration in seconds, null for live streams
+  thumbnailUrl String?
+  addedById    String?     @db.Uuid
+  isPublic     Boolean     @default(false)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+
+  // Relations
+  addedBy      User?         @relation("AddedContent", fields: [addedById], references: [id], onDelete: SetNull)
+  roomContents RoomContent[]
+
+  @@index([addedById])
+  @@index([type])
+  @@index([isPublic])
+  @@index([deletedAt])
+}
+
+model RoomContent {
+  id         String            @id @default(uuid()) @db.Uuid
+  roomId     String            @db.Uuid
+  contentId  String            @db.Uuid
+  queueOrder Int
+  addedById  String            @db.Uuid
+  status     RoomContentStatus @default(QUEUED)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  deletedAt  DateTime?
+
+  // Relations
+  room           Room                @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  content        Content             @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  addedBy        User                @relation("AddedRoomContent", fields: [addedById], references: [id], onDelete: Cascade)
+  playbackStates RoomPlaybackState[]
+
+  @@index([roomId])
+  @@index([contentId])
+  @@index([addedById])
+  @@index([status])
+  @@index([roomId, queueOrder])
+  @@index([deletedAt])
+}
+
+model Message {
+  id        String      @id @default(uuid()) @db.Uuid
+  roomId    String      @db.Uuid
+  senderId  String      @db.Uuid
+  text      String
+  type      MessageType @default(TEXT)
+  payload   Json?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender User @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@index([senderId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  title     String
+  message   String
+  type      NotificationType
+  isRead    Boolean          @default(false)
+  payload   Json?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  deletedAt DateTime?
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([type])
+  @@index([createdAt])
+  @@index([deletedAt])
+}
+
+model RoomPlaybackState {
+  id              String   @id @default(uuid()) @db.Uuid
+  roomId          String   @unique @db.Uuid
+  roomContentId   String?  @db.Uuid
+  isPlaying       Boolean  @default(false)
+  currentTime     Float    @default(0.0)
+  lastUpdatedTime DateTime @default(now())
+  speed           Float    @default(1.0)
+  updatedById     String?  @db.Uuid
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  room        Room         @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomContent RoomContent? @relation(fields: [roomContentId], references: [id], onDelete: SetNull)
+  updatedBy   User?        @relation("UpdatedPlaybacks", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@index([roomContentId])
+  @@index([updatedById])
+}
