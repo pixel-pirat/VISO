@@ -123,17 +123,23 @@ export function EditRoomModal({
           visibility,
           passcode:     visibility === "PRIVATE" ? passcode : "",
           coverUrl:     coverUrl || "",
-          scheduledAt:  scheduledAt ? new Date(scheduledAt).toISOString() : "",
+          // Only send scheduledAt if it's a valid non-empty string
+          ...(scheduledAt ? { scheduledAt: new Date(scheduledAt).toISOString() } : { scheduledAt: "" }),
           commChat, commAudio, commVideo, status,
         }),
       });
-      const data = await res.json();
+
+      // Guard against empty / non-JSON responses
+      const text = await res.text();
+      let data: Record<string, unknown> = {};
+      try { data = text ? JSON.parse(text) : {}; } catch { /* ignore */ }
+
       if (!res.ok) {
-        setError(data.issues ? data.issues.map((i: {message:string}) => i.message).join(", ") : data.error ?? "Failed.");
+        const issues = data.issues as { message: string }[] | undefined;
+        setError(issues ? issues.map((i) => i.message).join(", ") : (data.error as string) ?? "Failed to save.");
         return;
       }
-      // merge updated fields back into the full room data
-      onSaved({ ...room, ...data.room });
+      onSaved({ ...room, ...(data.room as object) });
     } catch {
       setError("Something went wrong.");
     } finally {
