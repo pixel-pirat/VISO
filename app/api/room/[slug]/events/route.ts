@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 
+// Allow SSE connections to stay open for up to 60s on Vercel Pro
+export const maxDuration = 60;
+
 // In-process event subscriber map for playback sync, reactions, member presence
 declare global {
   // eslint-disable-next-line no-var

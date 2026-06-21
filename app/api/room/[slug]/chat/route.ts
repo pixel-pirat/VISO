@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 
+// Allow SSE connections to stay open for up to 60s on Vercel Pro
+export const maxDuration = 60;
+
 // In-process SSE subscriber map: roomSlug → Set<controller>
 // In production use Redis pub/sub; for local dev this works fine within a single process.
 declare global {
