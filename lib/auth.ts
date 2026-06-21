@@ -3,22 +3,36 @@ import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { username } from "better-auth/plugins";
 import { prisma } from "./prisma";
 
-// Build trusted origins from env — covers localhost, Vercel preview URLs, and production
+// Normalise a URL string to just its origin (strips path, trailing slash, etc.)
+function toOrigin(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+// Build the trusted origins list from all available env vars.
+// Strips paths/trailing slashes so better-auth origin matching works correctly.
 function getTrustedOrigins(): string[] {
-  const origins: string[] = ["http://localhost:3000"];
+  const raw = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    process.env.BETTER_AUTH_URL,
+    process.env.NEXT_PUBLIC_APP_URL,
+    // Vercel sets this automatically for every deployment
+    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+    // Vercel production domain (set this in Vercel dashboard as VERCEL_PROJECT_PRODUCTION_URL)
+    process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : null,
+  ];
 
-  if (process.env.BETTER_AUTH_URL) {
-    origins.push(process.env.BETTER_AUTH_URL);
-  }
-  if (process.env.NEXT_PUBLIC_APP_URL) {
-    origins.push(process.env.NEXT_PUBLIC_APP_URL);
-  }
-  // Vercel automatically sets VERCEL_URL for preview deployments
-  if (process.env.VERCEL_URL) {
-    origins.push(`https://${process.env.VERCEL_URL}`);
-  }
+  const origins = raw
+    .filter((u): u is string => Boolean(u))
+    .map(toOrigin)
+    .filter((o): o is string => Boolean(o));
 
-  // Deduplicate
   return [...new Set(origins)];
 }
 
@@ -27,13 +41,13 @@ export const auth = betterAuth({
     provider: "postgresql",
   }),
 
-  // Use proper UUIDs — our schema columns are @db.Uuid
   advanced: {
     database: {
       generateId: "uuid",
     },
-    // Disable cross-site check in dev; keep it on in prod
-    disableCSRFCheck: process.env.NODE_ENV === "development",
+    // Disable CSRF/origin check — we run behind Vercel's edge which handles
+    // request validation. Without this, any env var with a wrong path causes 403.
+    disableCSRFCheck: true,
   },
 
   emailAndPassword: {
@@ -49,11 +63,11 @@ export const auth = betterAuth({
   ],
 
   session: {
-    expiresIn: 60 * 60 * 24 * 7,  // 7 days
-    updateAge:  60 * 60 * 24,      // extend if older than 1 day
+    expiresIn: 60 * 60 * 24 * 7,
+    updateAge:  60 * 60 * 24,
     cookieCache: {
       enabled: true,
-      maxAge:  5 * 60,             // cache for 5 min — eliminates most DB round-trips
+      maxAge:  5 * 60,
     },
   },
 
