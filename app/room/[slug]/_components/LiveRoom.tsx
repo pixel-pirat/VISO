@@ -120,12 +120,9 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
   });
   const reactionIdRef = useRef(0);
 
-  /* ── Connect LiveKit ── */
+  /* ── LiveKit + playback sync via data channel ── */
   useEffect(() => {
-    const lkRoom = new LKRoom({
-      adaptiveStream: true,
-      dynacast:       true,
-    });
+    const lkRoom = new LKRoom({ adaptiveStream: true, dynacast: true });
     lkRoomRef.current = lkRoom;
 
     function buildParticipant(p: Participant, local: boolean): RoomParticipant {
@@ -135,7 +132,6 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
       const aPub = p.getTrackPublications().find(
         (t) => t.kind === Track.Kind.Audio && t.trackSid
       ) as LocalTrackPublication | RemoteTrackPublication | undefined;
-
       return {
         identity:   p.identity,
         name:       p.name ?? p.identity,
@@ -157,36 +153,100 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
     }
 
     lkRoom
-      .on(RoomEvent.Connected,            ()  => { setLkConnected(true);  refreshParticipants(); })
-      .on(RoomEvent.Disconnected,         ()  => setLkConnected(false))
-      .on(RoomEvent.ParticipantConnected,  () => refreshParticipants())
+      .on(RoomEvent.Connected,               () => { setLkConnected(true); refreshParticipants(); })
+      .on(RoomEvent.Disconnected,            () => setLkConnected(false))
+      .on(RoomEvent.ParticipantConnected,    () => refreshParticipants())
       .on(RoomEvent.ParticipantDisconnected, () => refreshParticipants())
-      .on(RoomEvent.TrackSubscribed,       () => refreshParticipants())
-      .on(RoomEvent.TrackUnsubscribed,     () => refreshParticipants())
-      .on(RoomEvent.TrackMuted,            () => refreshParticipants())
-      .on(RoomEvent.TrackUnmuted,          () => refreshParticipants())
-      .on(RoomEvent.ActiveSpeakersChanged, () => refreshParticipants())
-      .on(RoomEvent.DataReceived, (payload) => {
+      .on(RoomEvent.TrackSubscribed,         () => refreshParticipants())
+      .on(RoomEvent.TrackUnsubscribed,       () => refreshParticipants())
+      .on(RoomEvent.TrackMuted,              () => refreshParticipants())
+      .on(RoomEvent.TrackUnmuted,            () => refreshParticipants())
+      .on(RoomEvent.ActiveSpeakersChanged,   () => refreshParticipants())
+      .on(RoomEvent.DataReceived, (payload, participant) => {
         try {
           const msg = JSON.parse(new TextDecoder().decode(payload));
+
+          // ── Playback sync from host → all viewers ──────────────
+          if (msg.type === "playback_sync") {
+            // Only trust sync messages that originate from the host
+            const senderIsHost = participant?.identity === roomInfo.hostId;
+            if (senderIsHost && !isHost) {
+              setPlaybackState((prev) => ({
+                isPlaying:   msg.isPlaying  ?? prev?.isPlaying  ?? false,
+                currentTime: msg.currentTime ?? prev?.currentTime ?? 0,
+                speed:       msg.speed       ?? prev?.speed       ?? 1,
+                roomContent: prev?.roomContent ?? null,
+                roomContentId: prev?.roomContentId,
+              }));
+            }
+          }
+
+          // ── Request sync — viewer asks host for current state ──
+          if (msg.type === "request_sync" && isHost) {
+            const v = videoRef.current;
+            const syncPayload = JSON.stringify({
+              type:        "playback_sync",
+              isPlaying:   !(v?.paused ?? true),
+              currentTime: v?.currentTime ?? 0,
+              speed:       v?.playbackRate ?? 1,
+            });
+            lkRoom.localParticipant.publishData(
+              new TextEncoder().encode(syncPayload),
+              { reliable: true }
+            );
+          }
+
+          // ── Reactions ──────────────────────────────────────────
           if (msg.type === "reaction") {
             const id = ++reactionIdRef.current;
-            setReactions((prev) => [...prev.slice(-10), { emoji: msg.emoji, senderId: msg.senderId, id }]);
+            setReactions((prev) => [...prev.slice(-10), { emoji: msg.emoji, senderId: msg.senderId ?? "", id }]);
             setReactionCounts((prev) => ({ ...prev, [msg.emoji]: (prev[msg.emoji] ?? 0) + 1 }));
           }
-        } catch { /* ignore */ }
+        } catch { /* ignore parse errors */ }
       });
 
     lkRoom.connect(livekitUrl, token, { autoSubscribe: true })
+      .then(() => {
+        // Once connected, non-hosts request sync from the host
+        if (!isHost) {
+          setTimeout(() => {
+            lkRoom.localParticipant.publishData(
+              new TextEncoder().encode(JSON.stringify({ type: "request_sync" })),
+              { reliable: true }
+            );
+          }, 1000); // brief delay to ensure host has received the connection event
+        }
+      })
       .catch((err) => console.error("LiveKit connect error:", err));
 
-    return () => {
-      lkRoom.disconnect();
-      lkRoomRef.current = null;
-    };
-  }, [token, livekitUrl, roomInfo.hostId]);
+    return () => { lkRoom.disconnect(); lkRoomRef.current = null; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, livekitUrl, roomInfo.hostId, isHost]);
 
-  /* ── SSE: Chat stream ── */
+  /* ── Host periodic sync tick — keeps viewers in sync while playing ── */
+  useEffect(() => {
+    if (!isHost) return;
+    const interval = setInterval(() => {
+      const lk = lkRoomRef.current;
+      const v  = videoRef.current;
+      if (!lk || !v) return;
+      // Only broadcast if playing — when paused viewers are already at the right position
+      if (!v.paused) {
+        lk.localParticipant.publishData(
+          new TextEncoder().encode(JSON.stringify({
+            type:        "playback_sync",
+            isPlaying:   true,
+            currentTime: v.currentTime,
+            speed:       v.playbackRate,
+          })),
+          { reliable: false } // unreliable is fine for periodic ticks — lower overhead
+        );
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [isHost]);
+
+  /* ── SSE: Chat stream (text messages only — reactions + playback use LiveKit) ── */
   useEffect(() => {
     const ctrl = new AbortController();
     const es   = new EventSource(`/api/room/${roomInfo.slug}/chat`);
@@ -201,27 +261,7 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
     return () => { ctrl.abort(); es.close(); };
   }, [roomInfo.slug]);
 
-  /* ── SSE: Events stream (playback sync, reactions) ── */
-  useEffect(() => {
-    const es = new EventSource(`/api/room/${roomInfo.slug}/events`);
-
-    es.onmessage = (e) => {
-      const data = JSON.parse(e.data);
-      if (data.type === "playback_sync") {
-        setPlaybackState(data.playbackState);
-      }
-      if (data.type === "reaction" && data.senderId !== currentUser.id) {
-        const id = ++reactionIdRef.current;
-        setReactions((prev) => [...prev.slice(-10), { emoji: data.emoji, senderId: data.senderId, id }]);
-        setReactionCounts((prev) => ({ ...prev, [data.emoji]: (prev[data.emoji] ?? 0) + 1 }));
-      }
-    };
-    es.onerror = () => es.close();
-
-    return () => es.close();
-  }, [roomInfo.slug, currentUser.id]);
-
-  /* ── Fetch initial playback state + queue ── */
+  /* ── Fetch initial playback state + queue on join ── */
   useEffect(() => {
     fetch(`/api/room/${roomInfo.slug}/playback`)
       .then((r) => r.json())
@@ -310,14 +350,27 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
     });
   }, [chatInput, roomInfo.slug]);
 
-  /* ── Host playback control — returns Promise so player can await it ── */
-  const controlPlayback = useCallback(async (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => {
+  /* ── Ref to the video element (set by VideoPlayer via onVideoRef) ── */
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  /* ── Host playback control ── broadcasts via LiveKit data channel (reaches all instances) ── */  const controlPlayback = useCallback(async (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => {
     if (!isHost) return;
-    await fetch(`/api/room/${roomInfo.slug}/playback`, {
+
+    // 1. Broadcast instantly to all viewers via LiveKit data channel
+    const lk = lkRoomRef.current;
+    if (lk) {
+      lk.localParticipant.publishData(
+        new TextEncoder().encode(JSON.stringify({ type: "playback_sync", ...update })),
+        { reliable: true }
+      );
+    }
+
+    // 2. Persist to DB (for late joiners + history) — fire and forget
+    fetch(`/api/room/${roomInfo.slug}/playback`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(update),
-    });
+    }).catch(console.error);
   }, [isHost, roomInfo.slug]);
 
   return (
@@ -352,6 +405,7 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
               queue={queue}
               isHost={isHost}
               onControl={controlPlayback}
+              onVideoRef={(el) => { videoRef.current = el; }}
             />
 
             {/* floating reactions */}

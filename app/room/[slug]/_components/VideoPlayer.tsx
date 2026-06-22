@@ -30,14 +30,14 @@ interface VideoPlayerProps {
   queue:         QueueItem[];
   isHost:        boolean;
   onControl:     (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => Promise<void>;
+  onVideoRef?:   (el: HTMLVideoElement | null) => void;
 }
 
-export function VideoPlayer({ playbackState, queue, isHost, onControl }: VideoPlayerProps) {
+export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRef }: VideoPlayerProps) {
   const videoRef  = useRef<HTMLVideoElement>(null);
   const hlsRef    = useRef<unknown>(null);
   const pollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tracks the last server-issued currentTime so we don't re-seek on every timeupdate
   const lastSyncTime = useRef<number>(-1);
 
   const [muted,       setMuted]       = useState(false);
@@ -152,6 +152,13 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl }: VideoPl
       v.removeEventListener("loadedmetadata", onMeta);
       v.removeEventListener("durationchange", onMeta);
     };
+  }, []);
+
+  /* ── Expose video element to parent (for host sync tick) ── */
+  useEffect(() => {
+    onVideoRef?.(videoRef.current);
+    return () => onVideoRef?.(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ── Cleanup ── */
