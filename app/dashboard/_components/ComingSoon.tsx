@@ -8,12 +8,13 @@ import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 
 interface ComingSoonProps {
-  icon: React.ElementType;
   title: string;
   description: string;
+  // Pass the icon as a rendered JSX element, not a component reference
+  iconElement: React.ReactNode;
 }
 
-export function ComingSoonPage({ icon: Icon, title, description }: ComingSoonProps) {
+export function ComingSoonPage({ iconElement, title, description }: ComingSoonProps) {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
 
@@ -36,7 +37,7 @@ export function ComingSoonPage({ icon: Icon, title, description }: ComingSoonPro
         <Topbar user={session.user} unreadCount={0} />
         <main className="flex-1 flex flex-col items-center justify-center gap-5 px-6">
           <div className="w-16 h-16 rounded-2xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-            <Icon className="w-7 h-7 text-violet-400" />
+            {iconElement}
           </div>
           <div className="text-center max-w-xs">
             <h1 className="text-lg font-bold text-white font-sans mb-2">{title}</h1>
