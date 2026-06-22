@@ -3,11 +3,12 @@
 import { useRef, useEffect, useState, useCallback } from "react";
 import {
   Play, Pause, RotateCcw, RotateCw,
-  Volume2, VolumeX, Subtitles, Maximize2, MonitorPlay,
+  Volume2, VolumeX, Subtitles, Maximize2, MonitorPlay, Lock,
 } from "lucide-react";
 import type { PlaybackState, QueueItem } from "./LiveRoom";
 
 function fmtTime(s: number) {
+  if (!isFinite(s) || s < 0) return "0:00";
   const h   = Math.floor(s / 3600);
   const m   = Math.floor((s % 3600) / 60);
   const sec = Math.floor(s % 60);
@@ -15,8 +16,6 @@ function fmtTime(s: number) {
   return `${m}:${String(sec).padStart(2,"0")}`;
 }
 
-// A Mux upload ID is a short alphanumeric string that hasn't yet been
-// replaced by a real stream URL. Format: 26 chars, no slashes or dots.
 function isMuxUploadId(url: string): boolean {
   return Boolean(url) &&
     !url.startsWith("http") &&
@@ -30,127 +29,116 @@ interface VideoPlayerProps {
   playbackState: PlaybackState | null;
   queue:         QueueItem[];
   isHost:        boolean;
-  onControl:     (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => void;
+  onControl:     (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => Promise<void>;
 }
 
 export function VideoPlayer({ playbackState, queue, isHost, onControl }: VideoPlayerProps) {
-  const videoRef    = useRef<HTMLVideoElement>(null);
-  const hlsRef      = useRef<unknown>(null);
-  const pollRef     = useRef<ReturnType<typeof setInterval> | null>(null);
-  const hideTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const videoRef  = useRef<HTMLVideoElement>(null);
+  const hlsRef    = useRef<unknown>(null);
+  const pollRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the last server-issued currentTime so we don't re-seek on every timeupdate
+  const lastSyncTime = useRef<number>(-1);
 
-  const [muted,      setMuted]      = useState(false);
-  const [localTime,  setLocalTime]  = useState(0);
-  const [duration,   setDuration]   = useState(0);
-  const [showCtrl,   setShowCtrl]   = useState(true);
-  const [loadErr,    setLoadErr]    = useState(false);
+  const [muted,       setMuted]       = useState(false);
+  const [localTime,   setLocalTime]   = useState(0);
+  const [duration,    setDuration]    = useState(0);
+  const [showCtrl,    setShowCtrl]    = useState(true);
+  const [loadErr,     setLoadErr]     = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const [processing,  setProcessing]  = useState(false);
   const [pollStatus,  setPollStatus]  = useState("");
+  const [isBusy,      setIsBusy]      = useState(false); // debounce rapid host clicks
 
-  // Pick content from playback state or first item in queue
   const rawContent = playbackState?.roomContent?.content ?? queue[0]?.content ?? null;
-
-  // Use resolved URL if we have one (from polling), otherwise raw
   const contentUrl = resolvedUrl ?? rawContent?.url ?? null;
   const contentType = rawContent?.type ?? "HLS";
 
-  const pending = Boolean(contentUrl && isMuxUploadId(contentUrl));
-  const isHLS   = !pending && (contentUrl?.includes("stream.mux.com") || contentUrl?.endsWith(".m3u8") || contentType === "HLS");
+  const pending  = Boolean(contentUrl && isMuxUploadId(contentUrl));
+  const isHLS    = !pending && (contentUrl?.includes("stream.mux.com") || contentUrl?.endsWith(".m3u8") || contentType === "HLS");
   const isDirect = !pending && Boolean(contentUrl) && (isHLS || contentType === "MP4" || contentType === "DASH");
 
-  /* ── Poll Mux status when URL is still an upload ID ── */
+  /* ── Poll Mux until transcoding is done ── */
   useEffect(() => {
     if (!pending || !contentUrl) {
       if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       return;
     }
-
     setProcessing(true);
-    setPollStatus("Uploading to Mux…");
-
     const uploadId = contentUrl;
-
     const check = async () => {
       try {
-        const res  = await fetch(`/api/mux/status/${uploadId}`);
-        const data = await res.json();
-
+        const data = await fetch(`/api/mux/status/${uploadId}`).then(r => r.json());
         if (data.status === "ready" && data.url) {
-          // Video is ready — update the resolved URL so the player loads it
           setResolvedUrl(data.url);
           setProcessing(false);
-          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-        } else if (data.status === "preparing" || data.status === "asset_created") {
-          setPollStatus("Transcoding… almost there");
-        } else if (data.status === "waiting") {
-          setPollStatus("Upload received, starting transcode…");
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
         } else {
-          setPollStatus(`Processing (${data.status ?? "checking"})…`);
+          setPollStatus(
+            data.status === "preparing" ? "Transcoding… almost there" :
+            data.status === "waiting"   ? "Upload received, starting transcode…" :
+            `Processing (${data.status ?? "checking"})…`
+          );
         }
-      } catch {
-        // Silently retry
-      }
+      } catch { /* retry silently */ }
     };
-
-    check(); // immediate first check
-    pollRef.current = setInterval(check, 5000); // then every 5s
-
-    return () => {
-      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-    };
+    check();
+    pollRef.current = setInterval(check, 5000);
+    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; } };
   }, [pending, contentUrl]);
 
-  /* ── Load video when URL becomes available ── */
+  /* ── Load video source ── */
   useEffect(() => {
     const v = videoRef.current;
     if (!v || !contentUrl || pending) return;
-
     setLoadErr(false);
-
-    // Destroy previous HLS instance
-    const prev = hlsRef.current as { destroy?: () => void } | null;
-    prev?.destroy?.();
+    (hlsRef.current as { destroy?: () => void } | null)?.destroy?.();
     hlsRef.current = null;
-
     if (!isDirect) return;
 
-    // Safari — native HLS
     if (isHLS && v.canPlayType("application/vnd.apple.mpegurl")) {
-      v.src = contentUrl;
-      return;
+      v.src = contentUrl; return;
     }
-
-    // Chrome/Firefox — hls.js
     if (isHLS) {
       import("hls.js").then(({ default: Hls }) => {
         if (!Hls.isSupported()) { setLoadErr(true); return; }
-        const hls = new Hls({ enableWorker: true, lowLatencyMode: false });
+        const hls = new Hls({ enableWorker: true });
         hls.loadSource(contentUrl);
         hls.attachMedia(v);
-        hls.on(Hls.Events.ERROR, (_: unknown, data: { fatal?: boolean }) => {
-          if (data.fatal) setLoadErr(true);
-        });
+        hls.on(Hls.Events.ERROR, (_: unknown, d: { fatal?: boolean }) => { if (d.fatal) setLoadErr(true); });
         hlsRef.current = hls;
       });
       return;
     }
-
     v.src = contentUrl;
   }, [contentUrl, isDirect, isHLS, pending]);
 
-  /* ── Sync with server playback state ── */
+  /* ── Sync video with server playback state ── */
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || !playbackState || pending) return;
-    const drift = Math.abs(v.currentTime - playbackState.currentTime);
-    if (drift > 2) v.currentTime = playbackState.currentTime;
-    if (playbackState.isPlaying && v.paused)   v.play().catch(() => {});
-    if (!playbackState.isPlaying && !v.paused) v.pause();
-    v.playbackRate = playbackState.speed ?? 1;
-  }, [playbackState, pending]);
+    if (!v || !playbackState || pending || !isDirect) return;
 
-  /* ── Track time ── */
+    const serverTime = playbackState.currentTime;
+    // Only seek if this is a new server-issued time (not our own echo)
+    if (Math.abs(serverTime - lastSyncTime.current) > 1) {
+      const drift = Math.abs(v.currentTime - serverTime);
+      if (drift > 1.5) {
+        v.currentTime = serverTime;
+      }
+      lastSyncTime.current = serverTime;
+    }
+
+    v.playbackRate = playbackState.speed ?? 1;
+
+    if (playbackState.isPlaying && v.paused) {
+      v.play().catch(() => {});
+    } else if (!playbackState.isPlaying && !v.paused) {
+      v.pause();
+    }
+  }, [playbackState, pending, isDirect]);
+
+  /* ── Track local time ── */
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -169,28 +157,41 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl }: VideoPl
   /* ── Cleanup ── */
   useEffect(() => {
     return () => {
-      const hls = hlsRef.current as { destroy?: () => void } | null;
-      hls?.destroy?.();
+      (hlsRef.current as { destroy?: () => void } | null)?.destroy?.();
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
 
   /* ── Auto-hide controls ── */
-  const showControls = useCallback(() => {
+  const revealControls = useCallback(() => {
     setShowCtrl(true);
     if (hideTimer.current) clearTimeout(hideTimer.current);
     hideTimer.current = setTimeout(() => setShowCtrl(false), 3000);
   }, []);
 
-  /* ── Host controls ── */
-  const hostPlay  = () => onControl({ isPlaying: true,  currentTime: videoRef.current?.currentTime });
-  const hostPause = () => onControl({ isPlaying: false, currentTime: videoRef.current?.currentTime });
-  const hostSeek  = (t: number) => { if (videoRef.current) videoRef.current.currentTime = t; onControl({ currentTime: t }); };
-  const hostSkip  = (d: number) => hostSeek((videoRef.current?.currentTime ?? 0) + d);
+  /* ── Host control helpers ── */
+  const hostControl = useCallback(async (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number }>) => {
+    if (!isHost || isBusy) return;
+    setIsBusy(true);
+    // Optimistic local update so host sees immediate feedback
+    const v = videoRef.current;
+    if (v) {
+      if (update.currentTime !== undefined) v.currentTime = update.currentTime;
+      if (update.isPlaying === true  && v.paused)  v.play().catch(() => {});
+      if (update.isPlaying === false && !v.paused) v.pause();
+    }
+    await onControl(update).catch(console.error);
+    setTimeout(() => setIsBusy(false), 300);
+  }, [isHost, isBusy, onControl]);
 
-  const pct = duration > 0 ? (localTime / duration) * 100 : 0;
+  const hostPlay  = () => hostControl({ isPlaying: true,  currentTime: videoRef.current?.currentTime });
+  const hostPause = () => hostControl({ isPlaying: false, currentTime: videoRef.current?.currentTime });
+  const hostSeek  = (t: number) => hostControl({ currentTime: t });
+  const hostSkip  = (d: number) => hostControl({ currentTime: Math.max(0, (videoRef.current?.currentTime ?? 0) + d) });
 
-  /* ── No content ── */
+  const pct = duration > 0 ? Math.min(100, (localTime / duration) * 100) : 0;
+
+  /* ── States: no content ── */
   if (!rawContent) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-neutral-950 gap-4">
@@ -201,7 +202,7 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl }: VideoPl
     );
   }
 
-  /* ── Processing / pending ── */
+  /* ── States: transcoding ── */
   if (processing || pending) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-neutral-950 gap-4">
@@ -213,28 +214,23 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl }: VideoPl
         <div className="text-center">
           <p className="text-sm font-semibold text-white font-sans">Video is transcoding</p>
           <p className="text-xs text-neutral-500 font-sans mt-1">{pollStatus || "Checking status…"}</p>
-          <p className="text-xs text-neutral-600 font-sans mt-0.5">Will play automatically when ready</p>
+          <p className="text-xs text-neutral-600 font-sans mt-0.5">Plays automatically when ready</p>
         </div>
-        {/* Pulsing progress indicator */}
         <div className="flex gap-1.5">
           {[0,1,2,3].map((i) => (
-            <div key={i} className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse"
-              style={{ animationDelay: `${i * 200}ms` }} />
+            <div key={i} className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" style={{ animationDelay: `${i*200}ms` }} />
           ))}
         </div>
       </div>
     );
   }
 
-  /* ── Load error ── */
+  /* ── States: load error ── */
   if (loadErr) {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-neutral-950 gap-3">
         <MonitorPlay className="w-10 h-10 text-red-500/50" />
         <p className="text-sm text-neutral-400 font-sans">Could not load video</p>
-        <p className="text-xs text-neutral-600 font-sans max-w-xs text-center">
-          The stream may not be ready yet. Try refreshing in a moment.
-        </p>
         <button onClick={() => { setLoadErr(false); setResolvedUrl(null); }}
           className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-lg text-xs text-neutral-300 font-sans transition-colors">
           Retry
@@ -244,15 +240,11 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl }: VideoPl
   }
 
   return (
-    <div className="relative w-full h-full bg-black overflow-hidden" onMouseMove={showControls}>
+    <div className="relative w-full h-full bg-black overflow-hidden" onMouseMove={revealControls}>
 
-      {/* Direct video (HLS / MP4) */}
+      {/* Direct video */}
       {isDirect && (
-        <video
-          ref={videoRef}
-          className="absolute inset-0 w-full h-full object-contain"
-          playsInline muted={muted}
-        />
+        <video ref={videoRef} className="absolute inset-0 w-full h-full object-contain" playsInline muted={muted} />
       )}
 
       {/* YouTube */}
@@ -272,58 +264,84 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl }: VideoPl
           allow="autoplay; fullscreen" />
       )}
 
-      {/* Controls overlay */}
+      {/* ── Controls overlay ── */}
       {isDirect && (
         <div className={`absolute inset-0 flex flex-col justify-end transition-opacity duration-300 ${showCtrl ? "opacity-100" : "opacity-0"}`}>
           <div className="absolute inset-0 bg-linear-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
-          <div className="relative z-10 px-4 pb-3">
 
-            {/* seek bar */}
-            <div className="relative w-full h-1.5 bg-white/20 rounded-full mb-3 cursor-pointer group/seek"
+          <div className="relative z-10 px-4 pb-3">
+            {/* ── Seek bar ── clickable for host, read-only for viewers */}
+            <div
+              className={`relative w-full h-1.5 rounded-full mb-3 group/seek ${isHost ? "cursor-pointer" : "cursor-default"} bg-white/20`}
               onClick={(e) => {
                 if (!isHost || !duration) return;
                 const rect = e.currentTarget.getBoundingClientRect();
                 hostSeek(((e.clientX - rect.left) / rect.width) * duration);
-              }}>
-              <div className="h-1.5 bg-violet-500 rounded-full" style={{ width: `${pct}%` }} />
-              <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow opacity-0 group-hover/seek:opacity-100 transition-opacity pointer-events-none"
-                style={{ left: `calc(${pct}% - 7px)` }} />
+              }}
+            >
+              <div className="h-1.5 bg-violet-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+              {/* scrub handle — only visible for host */}
+              {isHost && (
+                <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg opacity-0 group-hover/seek:opacity-100 transition-opacity pointer-events-none"
+                  style={{ left: `calc(${pct}% - 7px)` }} />
+              )}
             </div>
 
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
+
+                {/* Play / Pause — host gets clickable button, viewers get visual indicator */}
                 {isHost ? (
-                  <button onClick={playbackState?.isPlaying ? hostPause : hostPlay}
-                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors">
+                  <button
+                    onClick={playbackState?.isPlaying ? hostPause : hostPlay}
+                    disabled={isBusy}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 disabled:opacity-50 flex items-center justify-center transition-colors"
+                  >
                     {playbackState?.isPlaying
                       ? <Pause className="w-4 h-4 text-white" />
                       : <Play  className="w-4 h-4 text-white fill-white ml-0.5" />}
                   </button>
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center" title="Playback controlled by host">
                     {playbackState?.isPlaying
                       ? <Pause className="w-4 h-4 text-neutral-500" />
                       : <Play  className="w-4 h-4 text-neutral-500 ml-0.5" />}
                   </div>
                 )}
+
+                {/* Skip buttons — host only */}
                 {isHost && (
                   <>
-                    <button onClick={() => hostSkip(-10)} className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors" title="Back 10s">
+                    <button onClick={() => hostSkip(-10)} disabled={isBusy}
+                      className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 disabled:opacity-50 flex items-center justify-center transition-colors" title="Back 10s">
                       <RotateCcw className="w-3.5 h-3.5 text-white" />
                     </button>
-                    <button onClick={() => hostSkip(10)} className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors" title="Forward 10s">
+                    <button onClick={() => hostSkip(10)} disabled={isBusy}
+                      className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 disabled:opacity-50 flex items-center justify-center transition-colors" title="Forward 10s">
                       <RotateCw className="w-3.5 h-3.5 text-white" />
                     </button>
                   </>
                 )}
+
+                {/* Volume — everyone can adjust their own local volume */}
                 <button onClick={() => { const n = !muted; setMuted(n); if (videoRef.current) videoRef.current.muted = n; }}
                   className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors">
                   {muted ? <VolumeX className="w-3.5 h-3.5 text-white" /> : <Volume2 className="w-3.5 h-3.5 text-white" />}
                 </button>
+
+                {/* Time */}
                 <span className="text-[10px] text-white/80 font-sans tabular-nums">
                   {fmtTime(localTime)} / {fmtTime(duration)}
                 </span>
+
+                {/* Viewer lock indicator */}
+                {!isHost && (
+                  <div className="flex items-center gap-1 text-[9px] text-neutral-600 font-sans ml-1">
+                    <Lock className="w-2.5 h-2.5" /> Host controls
+                  </div>
+                )}
               </div>
+
               <div className="flex items-center gap-2">
                 <button className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors" title="Subtitles">
                   <Subtitles className="w-3.5 h-3.5 text-white" />

@@ -310,7 +310,7 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
     });
   }, [chatInput, roomInfo.slug]);
 
-  /* ── Host playback control ── */
+  /* ── Host playback control — returns Promise so player can await it ── */
   const controlPlayback = useCallback(async (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => {
     if (!isHost) return;
     await fetch(`/api/room/${roomInfo.slug}/playback`, {
