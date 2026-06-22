@@ -48,7 +48,8 @@ export async function POST(request: NextRequest) {
         cors_origin: origin,
         new_asset_settings: {
           playback_policy: ["public"],
-          encoding_tier:   "baseline",
+          // "smart" picks the fastest encoder for the input — much quicker than "baseline"
+          encoding_tier:   "smart",
           mp4_support:     "capped-1080p",
         },
       });

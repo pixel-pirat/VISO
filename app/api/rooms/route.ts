@@ -140,17 +140,19 @@ export async function POST(request: NextRequest) {
 
   // If a video was uploaded, create a Content record and queue it in the room
   if (videoUrl) {
-    const ext = videoUrl.split(".").pop()?.toLowerCase() ?? "";
-    const contentType = ext === "mp4" ? "MP4" : ext === "webm" || ext === "ogg" ? "HLS" : "MP4";
+    // Mux upload IDs are alphanumeric strings (not URLs yet).
+    // The webhook will update the URL to the real HLS stream once transcoding is done.
+    const isMuxId = !videoUrl.startsWith("http") && !videoUrl.startsWith("/") && !videoUrl.startsWith("data:");
 
     const content = await prisma.content.create({
       data: {
-        title:       contentTitle || name,
-        url:         videoUrl,
-        type:        contentType,
+        title:        contentTitle || name,
+        url:          videoUrl,
+        // Always HLS — Mux transcodes everything to HLS regardless of input format
+        type:         "HLS",
         thumbnailUrl: coverUrl || null,
-        addedById:   userId,
-        isPublic:    visibility === "PUBLIC",
+        addedById:    userId,
+        isPublic:     visibility === "PUBLIC",
       },
     });
 
@@ -160,7 +162,7 @@ export async function POST(request: NextRequest) {
         contentId:  content.id,
         queueOrder: 1,
         addedById:  userId,
-        status:     "QUEUED",
+        status:     isMuxId ? "QUEUED" : "QUEUED",
       },
     });
   }
