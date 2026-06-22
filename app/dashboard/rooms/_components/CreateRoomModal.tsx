@@ -157,29 +157,61 @@ export function CreateRoomModal({ onClose, onCreated }: CreateRoomModalProps) {
   ];
   const selVis = visOpts.find((o) => o.value === visibility)!;
 
-  /* ── upload with XHR so we can track progress ── */
+  /* ── upload handler — images go via our API, videos go direct to Mux ── */
   const upload = (file: File, kind: "cover" | "video") =>
     new Promise<string>((resolve, reject) => {
       setUploadState({ kind, progress: 0 });
+
       const fd = new FormData();
       fd.append("file", file);
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/rooms/upload");
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable)
-          setUploadState({ kind, progress: Math.round((e.loaded / e.total) * 100) });
-      };
-      xhr.onload = () => {
-        setUploadState(null);
-        if (xhr.status >= 200 && xhr.status < 300) {
-          const data = JSON.parse(xhr.responseText);
+
+      // Step 1 — ask our API what to do with this file
+      fetch("/api/rooms/upload", { method: "POST", body: fd })
+        .then(async (res) => {
+          const text = await res.text();
+          let data: Record<string, unknown>;
+          try { data = JSON.parse(text); }
+          catch { reject(new Error("Upload service error")); setUploadState(null); return; }
+
+          if (!res.ok) { reject(new Error((data.error as string) ?? "Upload failed")); setUploadState(null); return; }
+
+          // Image — API returned a data URL directly, we're done
+          if (data.type === "image") {
+            setUploadState(null);
+            resolve(data.url as string);
+            return;
+          }
+
+          // Video — API returned a Mux upload URL; PUT file directly to Mux
+          if (data.mux && data.uploadUrl) {
+            const muxXhr = new XMLHttpRequest();
+            muxXhr.open("PUT", data.uploadUrl as string);
+            muxXhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+            muxXhr.upload.onprogress = (e) => {
+              if (e.lengthComputable)
+                setUploadState({ kind, progress: Math.round((e.loaded / e.total) * 100) });
+            };
+            muxXhr.onload = () => {
+              if (muxXhr.status >= 200 && muxXhr.status < 300) {
+                setUploadState({ kind, progress: 100 });
+                // Return the uploadId as a placeholder URL — the webhook will
+                // replace it with the real HLS URL once Mux finishes transcoding
+                resolve(data.uploadId as string);
+              } else {
+                reject(new Error("Failed to upload video to Mux"));
+              }
+              setUploadState(null);
+            };
+            muxXhr.onerror = () => { setUploadState(null); reject(new Error("Video upload failed")); };
+            muxXhr.send(file);
+            return;
+          }
+
+          // Fallback
+          setUploadState(null);
           resolve(data.url as string);
-        } else {
-          reject(new Error(JSON.parse(xhr.responseText).error ?? "Upload failed"));
-        }
-      };
-      xhr.onerror = () => { setUploadState(null); reject(new Error("Upload failed")); };
-      xhr.send(fd);
+        })
+        .catch((err) => { setUploadState(null); reject(err); });
     });
 
   const handleFile = async (file: File, kind: "cover" | "video") => {
