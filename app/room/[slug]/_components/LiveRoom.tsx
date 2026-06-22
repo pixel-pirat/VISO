@@ -63,6 +63,31 @@ interface LiveRoomProps {
 
 const EMOJI_LIST = ["❤️","😂","🔥","😮","👏"] as const;
 
+/* ── Renders hidden <audio> elements for every remote participant ── */
+function RemoteAudioRenderer({ participants }: { participants: RoomParticipant[] }) {
+  return (
+    <div className="hidden" aria-hidden="true">
+      {participants
+        .filter((p) => !p.isLocal && p.audioTrack)
+        .map((p) => (
+          <AudioElement key={p.identity} track={p.audioTrack!} />
+        ))}
+    </div>
+  );
+}
+
+function AudioElement({ track }: { track: MediaStreamTrack }) {
+  const ref = useRef<HTMLAudioElement>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    const stream = new MediaStream([track]);
+    ref.current.srcObject = stream;
+    ref.current.play().catch(() => {/* autoplay policy — user must interact first */});
+    return () => { if (ref.current) ref.current.srcObject = null; };
+  }, [track]);
+  return <audio ref={ref} autoPlay playsInline />;
+}
+
 export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
   const { token, livekitUrl, room: roomInfo, role } = joinData;
   const isHost = role === "HOST" || role === "CO_HOST";
@@ -211,25 +236,34 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
   const toggleMic = useCallback(async () => {
     const lk = lkRoomRef.current;
     if (!lk) return;
-    if (isMuted) await lk.localParticipant.setMicrophoneEnabled(true);
-    else          await lk.localParticipant.setMicrophoneEnabled(false);
-    setIsMuted((v) => !v);
+    try {
+      const enabled = await lk.localParticipant.setMicrophoneEnabled(isMuted);
+      setIsMuted(!enabled);
+    } catch (err) {
+      console.error("Mic toggle failed:", err);
+    }
   }, [isMuted]);
 
   const toggleCamera = useCallback(async () => {
     const lk = lkRoomRef.current;
     if (!lk) return;
-    if (isVideoOff) await lk.localParticipant.setCameraEnabled(true);
-    else             await lk.localParticipant.setCameraEnabled(false);
-    setIsVideoOff((v) => !v);
+    try {
+      const enabled = await lk.localParticipant.setCameraEnabled(isVideoOff);
+      setIsVideoOff(!enabled);
+    } catch (err) {
+      console.error("Camera toggle failed:", err);
+    }
   }, [isVideoOff]);
 
   const toggleScreenShare = useCallback(async () => {
     const lk = lkRoomRef.current;
     if (!lk) return;
-    if (!isScreenSharing) await lk.localParticipant.setScreenShareEnabled(true);
-    else                   await lk.localParticipant.setScreenShareEnabled(false);
-    setIsScreenSharing((v) => !v);
+    try {
+      const enabled = await lk.localParticipant.setScreenShareEnabled(!isScreenSharing);
+      setIsScreenSharing(Boolean(enabled));
+    } catch (err) {
+      console.error("Screen share toggle failed:", err);
+    }
   }, [isScreenSharing]);
 
   const raiseHand = useCallback(() => {
@@ -390,6 +424,9 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
           100% { opacity: 0; transform: translateY(-80px) scale(1.4); }
         }
       `}</style>
+
+      {/* Hidden audio elements for remote participants — required for audio to play */}
+      <RemoteAudioRenderer participants={participants} />
     </div>
   );
 }

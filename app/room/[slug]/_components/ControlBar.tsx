@@ -52,18 +52,18 @@ export function ControlBar({
       <CtrlBtn
         icon={isMuted ? MicOff : Mic}
         label={isMuted ? "Unmute" : "Mute"}
-        title={isMuted ? "Unmute microphone" : "Mute microphone"}
+        title={!commAudio ? "Audio not enabled for this room" : isMuted ? "Unmute microphone" : "Mute microphone"}
         active={!isMuted}
         disabled={!commAudio}
-        onClick={onToggleMic}
+        onClick={commAudio ? onToggleMic : () => {}}
       />
       <CtrlBtn
         icon={isVideoOff ? VideoOff : Video}
         label={isVideoOff ? "Start Video" : "Stop Video"}
-        title={isVideoOff ? "Start camera" : "Stop camera"}
+        title={!commVideo ? "Video not enabled for this room" : isVideoOff ? "Start camera" : "Stop camera"}
         active={!isVideoOff}
         disabled={!commVideo}
-        onClick={onToggleCamera}
+        onClick={commVideo ? onToggleCamera : () => {}}
       />
       <CtrlBtn
         icon={isScreenSharing ? MonitorStop : MonitorUp}
