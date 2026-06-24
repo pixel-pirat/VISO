@@ -120,7 +120,16 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
   });
   const reactionIdRef = useRef(0);
 
+  /* ── Ref to the video element (set by VideoPlayer via onVideoRef) ── */
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
   /* ── LiveKit + playback sync via data channel ── */
+  // Use a stable callback ref pattern so DataReceived never closes over stale state
+  const isHostRef    = useRef(isHost);
+  const hostIdRef    = useRef(roomInfo.hostId);
+  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
+  useEffect(() => { hostIdRef.current = roomInfo.hostId; }, [roomInfo.hostId]);
+
   useEffect(() => {
     const lkRoom = new LKRoom({ adaptiveStream: true, dynacast: true });
     lkRoomRef.current = lkRoom;
@@ -168,30 +177,28 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
 
           // ── Playback sync from host → all viewers ──────────────
           if (msg.type === "playback_sync") {
-            // Only trust sync messages that originate from the host
-            const senderIsHost = participant?.identity === roomInfo.hostId;
-            if (senderIsHost && !isHost) {
+            const senderIsHost = participant?.identity === hostIdRef.current;
+            if (senderIsHost && !isHostRef.current) {
               setPlaybackState((prev) => ({
-                isPlaying:   msg.isPlaying  ?? prev?.isPlaying  ?? false,
-                currentTime: msg.currentTime ?? prev?.currentTime ?? 0,
-                speed:       msg.speed       ?? prev?.speed       ?? 1,
-                roomContent: prev?.roomContent ?? null,
+                isPlaying:    msg.isPlaying   ?? prev?.isPlaying   ?? false,
+                currentTime:  msg.currentTime ?? prev?.currentTime ?? 0,
+                speed:        msg.speed       ?? prev?.speed       ?? 1,
+                roomContent:  prev?.roomContent  ?? null,
                 roomContentId: prev?.roomContentId,
               }));
             }
           }
 
           // ── Request sync — viewer asks host for current state ──
-          if (msg.type === "request_sync" && isHost) {
-            const v = videoRef.current;
-            const syncPayload = JSON.stringify({
-              type:        "playback_sync",
-              isPlaying:   !(v?.paused ?? true),
-              currentTime: v?.currentTime ?? 0,
-              speed:       v?.playbackRate ?? 1,
-            });
+          if (msg.type === "request_sync" && isHostRef.current) {
+            const v = videoRef.current;  // always fresh via onVideoRef callback
             lkRoom.localParticipant.publishData(
-              new TextEncoder().encode(syncPayload),
+              new TextEncoder().encode(JSON.stringify({
+                type:        "playback_sync",
+                isPlaying:   !(v?.paused ?? true),
+                currentTime: v?.currentTime ?? 0,
+                speed:       v?.playbackRate ?? 1,
+              })),
               { reliable: true }
             );
           }
@@ -242,7 +249,7 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
           { reliable: false } // unreliable is fine for periodic ticks — lower overhead
         );
       }
-    }, 5000);
+    }, 2000); // sync every 2s while playing
     return () => clearInterval(interval);
   }, [isHost]);
 
@@ -349,9 +356,6 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
       body:    JSON.stringify({ text }),
     });
   }, [chatInput, roomInfo.slug]);
-
-  /* ── Ref to the video element (set by VideoPlayer via onVideoRef) ── */
-  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   /* ── Host playback control ── broadcasts via LiveKit data channel (reaches all instances) ── */  const controlPlayback = useCallback(async (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => {
     if (!isHost) return;

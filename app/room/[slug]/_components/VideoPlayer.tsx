@@ -120,22 +120,21 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
     if (!v || !playbackState || pending || !isDirect) return;
 
     const serverTime = playbackState.currentTime;
-    // Only seek if this is a new server-issued time (not our own echo)
+
+    // Seed localTime immediately so seek bar shows correct position before video loads
+    if (serverTime > 0) setLocalTime(serverTime);
+
+    // Only seek if this is a newly received server time (avoids re-seeking on every tick)
     if (Math.abs(serverTime - lastSyncTime.current) > 1) {
       const drift = Math.abs(v.currentTime - serverTime);
-      if (drift > 1.5) {
-        v.currentTime = serverTime;
-      }
+      if (drift > 1.5) v.currentTime = serverTime;
       lastSyncTime.current = serverTime;
     }
 
     v.playbackRate = playbackState.speed ?? 1;
 
-    if (playbackState.isPlaying && v.paused) {
-      v.play().catch(() => {});
-    } else if (!playbackState.isPlaying && !v.paused) {
-      v.pause();
-    }
+    if (playbackState.isPlaying && v.paused)   v.play().catch(() => {});
+    if (!playbackState.isPlaying && !v.paused) v.pause();
   }, [playbackState, pending, isDirect]);
 
   /* ── Track local time ── */
@@ -286,7 +285,7 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
                 hostSeek(((e.clientX - rect.left) / rect.width) * duration);
               }}
             >
-              <div className="h-1.5 bg-violet-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+              <div className="h-1.5 bg-violet-500 rounded-full" style={{ width: `${pct}%` }} />
               {/* scrub handle — only visible for host */}
               {isHost && (
                 <div className="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow-lg opacity-0 group-hover/seek:opacity-100 transition-opacity pointer-events-none"
