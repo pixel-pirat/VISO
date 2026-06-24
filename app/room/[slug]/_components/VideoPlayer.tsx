@@ -26,7 +26,7 @@ interface VideoPlayerProps {
   playbackState: PlaybackState | null;
   queue:         QueueItem[];
   isHost:        boolean;
-  onControl:     (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number }>) => Promise<void>;
+  onControl:     (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number }>) => void;
   onVideoRef?:   (el: HTMLVideoElement | null) => void;
 }
 
@@ -234,21 +234,22 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
   }, []);
 
   /* ── Host control — immediate local update + broadcast ── */
-  const doControl = useCallback(async (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number }>) => {
-    if (!isHost || busyRef.current) return;
-    busyRef.current = true;
+  const doControl = useCallback((update: Partial<{ isPlaying: boolean; currentTime: number; speed: number }>) => {
+    if (!isHost) return;
 
+    // Apply locally first — instant feedback, no waiting for round-trip
     const v = videoRef.current;
     if (v) {
       if (update.currentTime !== undefined) {
         v.currentTime = update.currentTime;
         setLocalTime(update.currentTime);
       }
-      if (update.isPlaying === true  && v.paused)  { await v.play().catch(() => {}); }
-      if (update.isPlaying === false && !v.paused) { v.pause(); }
+      if (update.isPlaying === true)  v.play().catch(() => {});
+      if (update.isPlaying === false) v.pause();
     }
-    await onControl(update).catch(console.error);
-    setTimeout(() => { busyRef.current = false; }, 200);
+
+    // Broadcast to all viewers (fire and forget)
+    try { onControl(update); } catch { /* ignore */ }
   }, [isHost, onControl]);
 
   const play  = () => doControl({ isPlaying: true,  currentTime: videoRef.current?.currentTime });
@@ -397,8 +398,12 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
                 {/* Play / Pause */}
                 {isHost ? (
                   <button
-                    onPointerDown={(e) => { e.stopPropagation(); isPlaying ? pause() : play(); }}
-                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const playing = !(videoRef.current?.paused ?? true);
+                      playing ? pause() : play();
+                    }}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all"
                   >
                     {isPlaying
                       ? <Pause className="w-4 h-4 text-white" />
@@ -414,26 +419,26 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
 
                 {/* Skip — host only */}
                 {isHost && <>
-                  <button onPointerDown={(e) => { e.stopPropagation(); skip(-10); }}
-                    className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors" title="-10s">
+                  <button onClick={(e) => { e.stopPropagation(); skip(-10); }}
+                    className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all" title="-10s">
                     <RotateCcw className="w-3.5 h-3.5 text-white" />
                   </button>
-                  <button onPointerDown={(e) => { e.stopPropagation(); skip(10); }}
-                    className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors" title="+10s">
+                  <button onClick={(e) => { e.stopPropagation(); skip(10); }}
+                    className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all" title="+10s">
                     <RotateCw className="w-3.5 h-3.5 text-white" />
                   </button>
                 </>}
 
                 {/* Volume */}
                 <button
-                  onPointerDown={(e) => {
+                  onClick={(e) => {
                     e.stopPropagation();
                     const v = videoRef.current;
                     if (!v) return;
                     v.muted = !v.muted;
                     setMuted(v.muted);
                   }}
-                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors"
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all"
                 >
                   {muted || volume === 0
                     ? <VolumeX className="w-3.5 h-3.5 text-white" />
@@ -456,8 +461,8 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
               {/* Right side */}
               <div className="flex items-center gap-1.5">
                 <button
-                  onPointerDown={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 flex items-center justify-center transition-colors"
+                  onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                  className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all"
                   title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                 >
                   {isFullscreen

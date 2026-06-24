@@ -357,10 +357,10 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
     });
   }, [chatInput, roomInfo.slug]);
 
-  /* ── Host playback control ── broadcasts via LiveKit data channel (reaches all instances) ── */  const controlPlayback = useCallback(async (update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => {
+  /* ── Host playback control ── broadcasts via LiveKit data channel ── */
+  const controlPlayback = useCallback((update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => {
     if (!isHost) return;
 
-    // 1. Broadcast instantly to all viewers via LiveKit data channel
     const lk = lkRoomRef.current;
     if (lk) {
       lk.localParticipant.publishData(
@@ -369,7 +369,7 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
       );
     }
 
-    // 2. Persist to DB (for late joiners + history) — fire and forget
+    // Persist to DB for late joiners
     fetch(`/api/room/${roomInfo.slug}/playback`, {
       method:  "PATCH",
       headers: { "Content-Type": "application/json" },
