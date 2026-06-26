@@ -1,13 +1,26 @@
 ﻿"use client";
-import { ComingSoonPage } from "../_components/ComingSoon";
-import { Film } from "lucide-react";
+import { DiscoverLayout } from "../_components/DiscoverLayout";
 
-export default function Page() {
+const SECTIONS = [
+  { title: "Now Playing",  path: "/movie/now_playing" },
+  { title: "Popular",      path: "/movie/popular" },
+  { title: "Top Rated",    path: "/movie/top_rated" },
+  { title: "Upcoming",     path: "/movie/upcoming" },
+  { title: "Action",       path: "/discover/movie", params: { with_genres: "28",    sort_by: "popularity.desc" } },
+  { title: "Comedy",       path: "/discover/movie", params: { with_genres: "35",    sort_by: "popularity.desc" } },
+  { title: "Horror",       path: "/discover/movie", params: { with_genres: "27",    sort_by: "popularity.desc" } },
+  { title: "Sci-Fi",       path: "/discover/movie", params: { with_genres: "878",   sort_by: "popularity.desc" } },
+  { title: "Drama",        path: "/discover/movie", params: { with_genres: "18",    sort_by: "popularity.desc" } },
+  { title: "Thriller",     path: "/discover/movie", params: { with_genres: "53",    sort_by: "popularity.desc" } },
+];
+
+export default function MoviesPage() {
   return (
-    <ComingSoonPage
-      iconElement={<Film className="w-7 h-7 text-violet-400" />}
-      title="Movies"
-      description="Browse movie watch parties and find a room streaming your favourite film."
+    <DiscoverLayout
+      pageTitle="Movies"
+      heroPath="/movie/now_playing"
+      sections={SECTIONS}
+      searchPath="/search/movie"
     />
   );
 }
