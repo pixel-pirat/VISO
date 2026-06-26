@@ -63,10 +63,10 @@ export function Sidebar({ user }: { user: User }) {
       {/* nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5 scrollbar-hide">
         <SectionLabel>General</SectionLabel>
-        <NavItem href="/dashboard" icon={Home}         label="Home"    active={pathname === "/dashboard"} />
-        <NavItem href="/dashboard/rooms"  icon={Tv2}   label="Rooms" />
-        <NavItem href="/dashboard/chat"   icon={MessageSquare} label="Chat" />
-        <NavItem href="/dashboard/friends" icon={Users} label="Friends" />
+        <NavItem href="/dashboard" icon={Home}          label="Home"    active={pathname === "/dashboard"} />
+        <NavItem href="/dashboard/rooms"   icon={Tv2}          label="Rooms"   active={pathname.startsWith("/dashboard/rooms")} />
+        <NavItem href="/dashboard/chat"    icon={MessageSquare} label="Chat"    active={pathname.startsWith("/dashboard/chat")} />
+        <NavItem href="/dashboard/friends" icon={Users}         label="Friends" active={pathname.startsWith("/dashboard/friends")} />
 
         <SectionLabel>Discover</SectionLabel>
         <NavItem href="/dashboard/trending" icon={TrendingUp} label="Trending" />
