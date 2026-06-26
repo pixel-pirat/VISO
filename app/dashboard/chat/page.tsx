@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { Suspense } from "react";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -33,7 +34,7 @@ function Avatar({ user, size = "md" }: { user: { id: string; name: string|null; 
   );
 }
 
-export default function ChatPage() {
+function ChatPageInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const { data: session, isPending } = authClient.useSession();
@@ -268,5 +269,17 @@ export default function ChatPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#111113]">
+        <Loader2 className="w-7 h-7 text-violet-500 animate-spin" />
+      </div>
+    }>
+      <ChatPageInner />
+    </Suspense>
   );
 }
