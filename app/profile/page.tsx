@@ -1,153 +1,221 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import {
-  LogOut, Mail, Shield, Calendar, Loader2,
-  Play, Home, Tv2, Users,
+  Play, LogOut, Settings, Tv2, Users, Home,
+  Mail, Calendar, Edit3, Loader2,
+  Film, Clock, Star,
 } from "lucide-react";
+
+type ProfileData = {
+  user: {
+    id: string; name: string; email: string; username: string | null;
+    displayName: string | null; avatarUrl: string | null; image: string | null;
+    status: string; createdAt: string;
+  };
+  stats: { roomsHosted: number; roomsJoined: number; friends: number };
+};
+
+const STATUS_LABEL: Record<string, { label: string; color: string; dot: string }> = {
+  ONLINE:          { label: "Online",           color: "text-emerald-400", dot: "bg-emerald-500" },
+  OFFLINE:         { label: "Offline",          color: "text-neutral-500", dot: "bg-neutral-600" },
+  IDLE:            { label: "Idle",             color: "text-yellow-400",  dot: "bg-yellow-500"  },
+  DO_NOT_DISTURB:  { label: "Do Not Disturb",   color: "text-red-400",     dot: "bg-red-500"     },
+};
 
 export default function ProfilePage() {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [loading,  setLoading]  = useState(true);
 
   useEffect(() => {
     if (!isPending && !session) router.push("/login");
   }, [session, isPending, router]);
 
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/profile")
+      .then(r => r.json())
+      .then(setProfile)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [session]);
+
   const handleSignOut = async () => {
     await authClient.signOut({
-      fetchOptions: {
-        onSuccess: () => { router.push("/login"); router.refresh(); },
-      },
+      fetchOptions: { onSuccess: () => { router.push("/login"); router.refresh(); } },
     });
   };
 
-  /* ── loading / unauthenticated ── */
-  if (isPending || !session) {
+  if (isPending || loading || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-950">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-7 h-7 text-violet-500 animate-spin" />
-          <p className="text-sm text-neutral-500 font-sans">Loading…</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-[#111113]">
+        <Loader2 className="w-7 h-7 text-violet-500 animate-spin" />
       </div>
     );
   }
 
-  const { user } = session;
-  const initials = user.name ? user.name.slice(0, 2).toUpperCase() : "U";
+  const user    = profile?.user ?? (session.user as unknown as ProfileData["user"]);
+  const stats   = profile?.stats ?? { roomsHosted: 0, roomsJoined: 0, friends: 0 };
+  const initials = user.name?.slice(0, 2).toUpperCase() ?? "U";
+  const avatar   = user.avatarUrl ?? user.image ?? null;
+  const statusInfo = STATUS_LABEL[user.status] ?? STATUS_LABEL.OFFLINE;
+  const displayHandle = user.username ? `@${user.username}` : user.email;
+  const joined = new Date(user.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long" });
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-200">
+    <div className="min-h-screen bg-[#111113] text-neutral-200">
 
-      {/* ── top nav ── */}
-      <header className="border-b border-neutral-800/60 backdrop-blur-xl bg-neutral-950/80 sticky top-0 z-40">
+      {/* ── Topnav ── */}
+      <header className="sticky top-0 z-40 border-b border-neutral-800/60 bg-[#111113]/90 backdrop-blur-xl">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center">
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-linear-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center">
               <Play className="w-3.5 h-3.5 text-white fill-white" />
             </div>
             <span className="text-sm font-extrabold tracking-widest text-white uppercase font-sans">VISO</span>
           </Link>
           <nav className="hidden sm:flex items-center gap-5">
-            <Link href="/"      className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-white transition-colors font-sans"><Home className="w-3.5 h-3.5" /> Home</Link>
-            <Link href="#"      className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-white transition-colors font-sans"><Tv2  className="w-3.5 h-3.5" /> Rooms</Link>
-            <Link href="#"      className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-white transition-colors font-sans"><Users className="w-3.5 h-3.5" /> Friends</Link>
+            <Link href="/dashboard"         className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-white transition-colors font-sans"><Home className="w-3.5 h-3.5" /> Home</Link>
+            <Link href="/dashboard/rooms"   className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-white transition-colors font-sans"><Tv2  className="w-3.5 h-3.5" /> Rooms</Link>
+            <Link href="/dashboard/friends" className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-white transition-colors font-sans"><Users className="w-3.5 h-3.5" /> Friends</Link>
           </nav>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-red-400 transition-colors font-sans"
-          >
-            <LogOut className="w-3.5 h-3.5" /> Sign out
-          </button>
+          <div className="flex items-center gap-3">
+            <Link href="/dashboard/settings"
+              className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-white transition-colors font-sans">
+              <Settings className="w-3.5 h-3.5" /> Settings
+            </Link>
+            <button onClick={handleSignOut}
+              className="flex items-center gap-1.5 text-xs text-neutral-500 hover:text-red-400 transition-colors font-sans">
+              <LogOut className="w-3.5 h-3.5" /> Sign out
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* ── main ── */}
-      <main className="max-w-2xl mx-auto px-4 py-12">
+      <main className="max-w-3xl mx-auto px-4 py-10 space-y-6">
 
-        {/* card */}
-        <div className="rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/60 shadow-2xl shadow-black/30">
+        {/* ── Profile card ── */}
+        <div className="rounded-2xl overflow-hidden border border-neutral-800 bg-neutral-900/60 shadow-2xl">
 
-          {/* cover banner */}
-          <div className="h-28 bg-gradient-to-r from-violet-600/70 via-fuchsia-600/60 to-violet-800/70 relative">
-            {/* subtle noise-like pattern overlay */}
-            <div className="absolute inset-0 opacity-20"
-              style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%)", backgroundSize: "6px 6px" }} />
-            {/* VISO badge */}
-            <div className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1 bg-black/30 backdrop-blur rounded-full text-[10px] font-bold text-white uppercase tracking-widest font-sans">
-              <Play className="w-2.5 h-2.5 fill-white" /> VISO Member
-            </div>
+          {/* Cover */}
+          <div className="h-36 bg-linear-to-br from-violet-600/60 via-fuchsia-600/40 to-indigo-900/60 relative">
+            <div className="absolute inset-0 opacity-10"
+              style={{ backgroundImage: "repeating-linear-gradient(45deg,#fff 0,#fff 1px,transparent 0,transparent 50%)", backgroundSize: "8px 8px" }} />
+            {/* Edit button */}
+            <Link href="/dashboard/settings"
+              className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 bg-black/40 hover:bg-black/60 backdrop-blur rounded-xl text-xs font-semibold text-white transition-colors border border-white/10 font-sans">
+              <Edit3 className="w-3.5 h-3.5" /> Edit Profile
+            </Link>
           </div>
 
-          {/* body */}
-          <div className="px-7 pb-8 pt-4 relative">
-
-            {/* avatar — overlaps cover */}
-            <div className="absolute -top-14 left-7">
-              <div className="w-[88px] h-[88px] rounded-2xl bg-neutral-950 border-4 border-neutral-900 flex items-center justify-center overflow-hidden shadow-xl">
-                {user.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={user.image} alt={user.name ?? ""} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-3xl font-extrabold bg-gradient-to-tr from-violet-400 to-fuchsia-400 bg-clip-text text-transparent font-sans">
-                    {initials}
-                  </span>
-                )}
+          {/* Body */}
+          <div className="px-6 pb-6 pt-0 relative">
+            {/* Avatar */}
+            <div className="flex items-end justify-between">
+              <div className="relative -mt-12">
+                <div className="w-24 h-24 rounded-2xl border-4 border-neutral-900 bg-neutral-950 overflow-hidden shadow-xl flex items-center justify-center">
+                  {avatar
+                    ? <img src={avatar} alt={user.name} className="w-full h-full object-cover" /> // eslint-disable-line @next/next/no-img-element
+                    : <span className="text-3xl font-extrabold bg-linear-to-tr from-violet-400 to-fuchsia-400 bg-clip-text text-transparent font-sans">{initials}</span>}
+                </div>
+                <div className={`absolute bottom-1 right-1 w-4 h-4 rounded-full ${statusInfo.dot} border-[3px] border-neutral-900`} />
               </div>
-              {/* online dot */}
-              <div className="absolute bottom-0.5 right-0.5 w-4 h-4 bg-emerald-500 border-[3px] border-neutral-900 rounded-full" title="Online" />
+
+              <Link href="/dashboard/rooms"
+                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-xs font-bold text-white transition-colors font-sans shadow-lg shadow-violet-500/20 mt-2">
+                <Tv2 className="w-3.5 h-3.5" /> Browse Rooms
+              </Link>
             </div>
 
-            {/* spacer */}
-            <div className="h-10" />
-
-            {/* name row */}
-            <div className="mb-6">
-              <h1 className="text-xl font-extrabold text-white font-sans leading-tight">{user.name}</h1>
-              <p className="text-sm text-neutral-500 font-sans mt-0.5">@{(user as { username?: string }).username ?? "—"}</p>
+            {/* Name & handle */}
+            <div className="mt-4 mb-5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl font-extrabold text-white font-sans">{user.displayName || user.name}</h1>
+                <span className={`text-xs font-semibold font-sans ${statusInfo.color}`}>● {statusInfo.label}</span>
+              </div>
+              <p className="text-sm text-neutral-500 font-sans mt-0.5">{displayHandle}</p>
+              {user.displayName && user.name !== user.displayName && (
+                <p className="text-xs text-neutral-600 font-sans mt-0.5">{user.name}</p>
+              )}
             </div>
 
-            {/* info rows */}
-            <div className="space-y-3 border-t border-neutral-800/60 pt-5 mb-7">
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-4 p-4 bg-neutral-800/40 rounded-xl mb-5 border border-neutral-800/60">
               {[
-                { icon: Mail,     color: "text-violet-400",  label: "Email",        value: user.email },
-                { icon: Shield,   color: "text-fuchsia-400", label: "Session",      value: session.session.id, mono: true },
-                { icon: Calendar, color: "text-emerald-400", label: "Member since", value: new Date(user.createdAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) },
-              ].map(({ icon: Icon, color, label, value, mono }) => (
-                <div key={label} className="flex items-center gap-3.5">
-                  <div className="w-9 h-9 rounded-xl bg-neutral-950 border border-neutral-800 flex items-center justify-center flex-shrink-0">
-                    <Icon className={`w-4 h-4 ${color}`} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-600 font-sans">{label}</p>
-                    <p className={`text-sm text-neutral-200 font-sans truncate ${mono ? "font-mono text-xs text-neutral-500" : ""}`}>{value}</p>
-                  </div>
+                { icon: Film,  label: "Rooms Hosted", value: stats.roomsHosted },
+                { icon: Clock, label: "Rooms Joined",  value: stats.roomsJoined },
+                { icon: Users, label: "Friends",        value: stats.friends },
+              ].map(({ icon: Icon, label, value }) => (
+                <div key={label} className="flex flex-col items-center gap-1 text-center">
+                  <Icon className="w-4 h-4 text-violet-400 mb-0.5" />
+                  <p className="text-lg font-extrabold text-white font-sans leading-none">{value}</p>
+                  <p className="text-[10px] text-neutral-500 font-sans">{label}</p>
                 </div>
               ))}
             </div>
 
-            {/* actions */}
-            <div className="flex gap-3">
-              <button
-                onClick={handleSignOut}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 border border-neutral-800 hover:border-red-500/40 hover:bg-red-500/5 rounded-xl text-sm font-semibold text-neutral-400 hover:text-red-400 transition-all font-sans"
-              >
-                <LogOut className="w-4 h-4" /> Sign Out
-              </button>
-              <Link
-                href="/"
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 bg-gradient-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 rounded-xl text-sm font-semibold text-white transition-all font-sans shadow-lg shadow-violet-500/20"
-              >
-                <Tv2 className="w-4 h-4" /> Browse Rooms
-              </Link>
+            {/* Info rows */}
+            <div className="space-y-3 pt-4 border-t border-neutral-800/60">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
+                  <Mail className="w-3.5 h-3.5 text-violet-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-600 font-sans">Email</p>
+                  <p className="text-sm text-neutral-200 font-sans">{user.email}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-600 font-sans">Member Since</p>
+                  <p className="text-sm text-neutral-200 font-sans">{joined}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-neutral-800 flex items-center justify-center shrink-0">
+                  <Star className="w-3.5 h-3.5 text-yellow-400" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-600 font-sans">VISO Member</p>
+                  <p className="text-sm text-neutral-200 font-sans">Early Access</p>
+                </div>
+              </div>
             </div>
-
           </div>
         </div>
+
+        {/* Quick actions */}
+        <div className="grid grid-cols-2 gap-3">
+          <Link href="/dashboard/settings"
+            className="flex items-center gap-3 p-4 rounded-xl bg-neutral-900/60 border border-neutral-800 hover:border-violet-500/40 transition-colors group">
+            <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-colors">
+              <Settings className="w-4 h-4 text-violet-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white font-sans">Settings</p>
+              <p className="text-xs text-neutral-500 font-sans">Edit your profile</p>
+            </div>
+          </Link>
+          <Link href="/dashboard/friends"
+            className="flex items-center gap-3 p-4 rounded-xl bg-neutral-900/60 border border-neutral-800 hover:border-violet-500/40 transition-colors group">
+            <div className="w-9 h-9 rounded-xl bg-violet-500/10 flex items-center justify-center group-hover:bg-violet-500/20 transition-colors">
+              <Users className="w-4 h-4 text-violet-400" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-white font-sans">Friends</p>
+              <p className="text-xs text-neutral-500 font-sans">{stats.friends} connections</p>
+            </div>
+          </Link>
+        </div>
+
       </main>
     </div>
   );
