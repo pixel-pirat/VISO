@@ -15,7 +15,12 @@ function year(m: MediaItem)  { return (m.release_date ?? m.first_air_date ?? "")
 function rating(m: MediaItem){ return m.vote_average.toFixed(1); }
 
 /* ── MediaCard ─────────────────────────────────────────────────── */
-function MediaCard({ item, onPlay }: { item: MediaItem; onPlay: (item: MediaItem) => void }) {
+function MediaCard({ item, onPlay, onWatchlist, inWatchlist }: {
+  item: MediaItem;
+  onPlay: (item: MediaItem) => void;
+  onWatchlist?: (item: MediaItem) => void;
+  inWatchlist?: boolean;
+}) {
   const poster = IMG.poster(item.poster_path, "w342");
 
   return (
@@ -33,11 +38,23 @@ function MediaCard({ item, onPlay }: { item: MediaItem; onPlay: (item: MediaItem
       {/* overlay on hover */}
       <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
         <button
-          className="w-full flex items-center justify-center gap-2 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg text-xs font-bold text-white transition-colors font-sans mb-2"
+          className="w-full flex items-center justify-center gap-2 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg text-xs font-bold text-white transition-colors font-sans mb-1.5"
           onClick={(e) => { e.stopPropagation(); onPlay(item); }}
         >
           <Play className="w-3.5 h-3.5 fill-white" /> Watch Trailer
         </button>
+        {onWatchlist && (
+          <button
+            className={`w-full flex items-center justify-center gap-2 py-1.5 rounded-lg text-xs font-semibold transition-colors font-sans border ${
+              inWatchlist
+                ? "bg-violet-600/30 border-violet-500 text-violet-300"
+                : "bg-black/40 border-white/20 text-white hover:bg-black/60"
+            }`}
+            onClick={(e) => { e.stopPropagation(); onWatchlist(item); }}
+          >
+            {inWatchlist ? "✓ Saved" : "+ Watchlist"}
+          </button>
+        )}
       </div>
 
       {/* info */}
@@ -173,8 +190,9 @@ function TrailerModal({ item, onClose }: { item: MediaItem; onClose: () => void 
 }
 
 /* ── Section with horizontal scroll ───────────────────────────── */
-function ScrollSection({ title: sTitle, items, onPlay, loading }: {
-  title: string; items: MediaItem[]; onPlay: (i: MediaItem) => void; loading: boolean;
+function ScrollSection({ title: sTitle, items, onPlay, onWatchlist, watchlistIds, loading }: {
+  title: string; items: MediaItem[]; onPlay: (i: MediaItem) => void;
+  onWatchlist: (i: MediaItem) => void; watchlistIds: Set<string>; loading: boolean;
 }) {
   return (
     <section className="mb-8">
@@ -185,7 +203,12 @@ function ScrollSection({ title: sTitle, items, onPlay, loading }: {
         </div>
       ) : (
         <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2">
-          {items.map(item => <div key={item.id} className="shrink-0 w-36"><MediaCard item={item} onPlay={onPlay} /></div>)}
+          {items.map(item => (
+            <div key={item.id} className="shrink-0 w-36">
+              <MediaCard item={item} onPlay={onPlay} onWatchlist={onWatchlist}
+                inWatchlist={watchlistIds.has(`${item.id}-${item.media_type ?? (item.title ? "movie" : "tv")}`)} />
+            </div>
+          ))}
         </div>
       )}
     </section>
@@ -214,6 +237,52 @@ export function DiscoverLayout({ pageTitle, heroPath, heroParams, sections, sear
   const [query,      setQuery]      = useState("");
   const [searchRes,  setSearchRes]  = useState<MediaItem[]>([]);
   const [searching,  setSearching]  = useState(false);
+  const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
+
+  // Load watchlist IDs for "already saved" state
+  useEffect(() => {
+    if (!session) return;
+    fetch("/api/library/watchlist")
+      .then(r => r.json())
+      .then(d => {
+        const ids = new Set<string>(
+          (d.items ?? []).map((i: { tmdbId: number; mediaType: string }) => `${i.tmdbId}-${i.mediaType}`)
+        );
+        setWatchlistIds(ids);
+      })
+      .catch(() => {});
+  }, [session]);
+
+  const toggleWatchlist = useCallback(async (item: MediaItem) => {
+    const mediaType = item.title ? "movie" : "tv";
+    const key = `${item.id}-${mediaType}`;
+    const isIn = watchlistIds.has(key);
+
+    if (isIn) {
+      // Find the DB id to delete — fetch fresh list
+      const res  = await fetch("/api/library/watchlist");
+      const data = await res.json();
+      const found = (data.items ?? []).find((i: { tmdbId: number; mediaType: string; id: string }) =>
+        i.tmdbId === item.id && i.mediaType === mediaType
+      );
+      if (found) {
+        await fetch(`/api/library/watchlist/${found.id}`, { method: "DELETE" });
+        setWatchlistIds(prev => { const next = new Set(prev); next.delete(key); return next; });
+      }
+    } else {
+      await fetch("/api/library/watchlist", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          tmdbId:    item.id,
+          mediaType,
+          title:     item.title ?? item.name ?? "",
+          posterPath: item.poster_path,
+        }),
+      });
+      setWatchlistIds(prev => new Set(prev).add(key));
+    }
+  }, [watchlistIds]);
 
   useEffect(() => { if (!isPending && !session) router.push("/login"); }, [session, isPending, router]);
 
@@ -294,6 +363,8 @@ export function DiscoverLayout({ pageTitle, heroPath, heroParams, sections, sear
                   title={sec.title}
                   items={sectionData[sec.title] ?? []}
                   onPlay={setActiveItem}
+                  onWatchlist={toggleWatchlist}
+                  watchlistIds={watchlistIds}
                   loading={loadingMap[sec.title] ?? true}
                 />
               ))}

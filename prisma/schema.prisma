@@ -32,6 +32,8 @@ model User {
   // better-auth relations
   sessions            Session[]
   accounts            Account[]
+  // library
+  watchlist           Watchlist[]
   // app relations
   addedContent        Content[]           @relation("AddedContent")
   receivedFriendships Friendship[]        @relation("ReceivedFriendships")
@@ -93,6 +95,23 @@ model Verification {
   updatedAt  DateTime?
 
   @@map("verification")
+}
+
+// ── Library ──────────────────────────────────────────────────
+
+model Watchlist {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  tmdbId     Int
+  mediaType  String                    // "movie" | "tv"
+  title      String
+  posterPath String?
+  addedAt    DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tmdbId, mediaType])
+  @@index([userId])
+  @@map("watchlist")
 }
 
 
