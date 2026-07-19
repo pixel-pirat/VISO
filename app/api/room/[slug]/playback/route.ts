@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
-import { broadcastEvent } from "../events/route";
+import { z } from "zod";
+import { broadcastEvent } from "@/lib/room-events";
+
+const playbackSchema = z.object({
+  isPlaying:     z.boolean().optional(),
+  currentTime:   z.number().min(0).max(1_000_000).optional(),
+  speed:         z.number().min(0.25).max(4).optional(),
+  roomContentId: z.string().uuid().nullable().optional(),
+});
 
 // ── PATCH /api/room/[slug]/playback — host controls play/pause/seek ──
 export async function PATCH(
@@ -22,7 +30,11 @@ export async function PATCH(
   if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
   if (room.hostId !== userId) return NextResponse.json({ error: "Forbidden — host only" }, { status: 403 });
 
-  const { isPlaying, currentTime, speed, roomContentId } = await request.json();
+  const parsed = playbackSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
+  }
+  const { isPlaying, currentTime, speed, roomContentId } = parsed.data;
 
   const updated = await prisma.roomPlaybackState.upsert({
     where:  { roomId: room.id },

@@ -17,6 +17,8 @@ export async function GET(
 
   const room = await prisma.room.findFirst({
     where: { slug, deletedAt: null },
+    // Re-select the secrets so the host (and only the host) can see them below
+    omit: { passcode: false, inviteToken: false },
     include: {
       host: {
         select: { id: true, name: true, username: true, image: true, status: true },
@@ -67,7 +69,11 @@ export async function GET(
   // Determine the current user's membership & role
   const myMembership = room.members.find((m) => m.userId === userId);
 
-  return NextResponse.json({ room, myMembership: myMembership ?? null });
+  // Only the host may see the passcode and invite token
+  const isHost = room.hostId === userId;
+  const safeRoom = isHost ? room : { ...room, passcode: null, inviteToken: null };
+
+  return NextResponse.json({ room: safeRoom, myMembership: myMembership ?? null });
 }
 
 // ── PATCH /api/rooms/[slug] — host-only edit ──────────────────

@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { AccessToken } from "livekit-server-sdk";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -15,16 +15,58 @@ export async function POST(
   const userId   = session.user.id;
   const user     = session.user;
 
+  // Optional credentials for private rooms (body may be absent)
+  const body = await req.json().catch(() => ({}));
+  const passcodeInput = typeof body?.passcode    === "string" ? body.passcode    : "";
+  const inviteInput   = typeof body?.inviteToken === "string" ? body.inviteToken : "";
+
   const room = await prisma.room.findFirst({
     where: { slug, deletedAt: null },
+    // Secrets are globally omitted — opt back in to check them here
+    omit: { passcode: false, inviteToken: false },
     include: { members: { where: { userId } } },
   });
   if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
 
-  // Upsert membership
   const existing = room.members[0];
   const isHost   = room.hostId === userId;
-  const role     = isHost ? "HOST" : (existing?.role ?? "VIEWER");
+
+  if (existing?.isBanned) {
+    return NextResponse.json({ error: "You are banned from this room" }, { status: 403 });
+  }
+
+  // ── Access control ──────────────────────────────────────────
+  // Hosts and existing (admitted) members are always allowed. Everyone else
+  // is allowed into PUBLIC rooms; PRIVATE/UNLISTED rooms require a valid
+  // invite token or the room passcode.
+  const isMember = existing ? !existing.deletedAt : false;
+  let allowed = isHost || isMember || room.visibility === "PUBLIC";
+
+  if (!allowed && room.inviteToken && inviteInput) {
+    allowed = inviteInput === room.inviteToken;
+  }
+  if (!allowed && room.passcode && passcodeInput) {
+    allowed = passcodeInput === room.passcode;
+  }
+
+  if (!allowed) {
+    if (room.passcode) {
+      return NextResponse.json(
+        {
+          error: passcodeInput ? "Incorrect passcode" : "This room requires a passcode",
+          code:  "PASSCODE_REQUIRED",
+        },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json(
+      { error: "This room is private — you need an invite link from the host", code: "INVITE_REQUIRED" },
+      { status: 403 }
+    );
+  }
+
+  // Upsert membership
+  const role = isHost ? "HOST" : (existing?.role ?? "VIEWER");
 
   if (!existing) {
     await prisma.roomMember.create({
@@ -33,7 +75,7 @@ export async function POST(
   } else {
     await prisma.roomMember.update({
       where: { id: existing.id },
-      data:  { lastSeenAt: new Date() },
+      data:  { lastSeenAt: new Date(), deletedAt: null },
     });
   }
 
@@ -75,6 +117,8 @@ export async function POST(
       commVideo:    room.commVideo,
       hostId:       room.hostId,
       status:       room.status,
+      // Hosts get the invite token so the in-room Invite button can share it
+      inviteToken:  isHost ? room.inviteToken : null,
     },
     role,
   });

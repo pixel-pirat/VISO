@@ -2,31 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
+import { z } from "zod";
+import { getRoomAccess } from "@/lib/room-access";
+import { getChatSubscribers, broadcastChat } from "@/lib/room-events";
 
 // Allow SSE connections to stay open for up to 60s on Vercel Pro
 export const maxDuration = 60;
-
-// In-process SSE subscriber map: roomSlug → Set<controller>
-// In production use Redis pub/sub; for local dev this works fine within a single process.
-declare global {
-  // eslint-disable-next-line no-var
-  var _chatSubscribers: Map<string, Set<ReadableStreamDefaultController>>;
-}
-globalThis._chatSubscribers ??= new Map();
-
-function getSubscribers(slug: string) {
-  if (!globalThis._chatSubscribers.has(slug)) {
-    globalThis._chatSubscribers.set(slug, new Set());
-  }
-  return globalThis._chatSubscribers.get(slug)!;
-}
-
-function broadcast(slug: string, data: object) {
-  const payload = `data: ${JSON.stringify(data)}\n\n`;
-  for (const ctrl of getSubscribers(slug)) {
-    try { ctrl.enqueue(new TextEncoder().encode(payload)); } catch { /* client disconnected */ }
-  }
-}
 
 // ── GET — SSE stream ──────────────────────────────────────────
 export async function GET(
@@ -38,10 +19,14 @@ export async function GET(
 
   const { slug } = await params;
 
+  const { room, canRead } = await getRoomAccess(slug, session.user.id);
+  if (!room)    return new Response("Room not found", { status: 404 });
+  if (!canRead) return new Response("Forbidden", { status: 403 });
+
   // Send last 50 messages on connect
   const history = await prisma.message.findMany({
     where: {
-      room: { slug, deletedAt: null },
+      roomId: room.id,
       deletedAt: null,
     },
     include: { sender: { select: { id: true, name: true, username: true, image: true } } },
@@ -54,7 +39,7 @@ export async function GET(
   const stream = new ReadableStream({
     start(controller) {
       ctrl = controller;
-      getSubscribers(slug).add(ctrl);
+      getChatSubscribers(slug).add(ctrl);
 
       // Send history immediately
       const init = `data: ${JSON.stringify({ type: "history", messages: history.reverse() })}\n\n`;
@@ -68,7 +53,7 @@ export async function GET(
 
       request.signal.addEventListener("abort", () => {
         clearInterval(ping);
-        getSubscribers(slug).delete(ctrl);
+        getChatSubscribers(slug).delete(ctrl);
         try { ctrl.close(); } catch { /* already closed */ }
       });
     },
@@ -85,6 +70,12 @@ export async function GET(
 }
 
 // ── POST — send message ───────────────────────────────────────
+// SYSTEM / CONTENT_SHARE are server-generated only — clients can't send them.
+const messageSchema = z.object({
+  text: z.string().trim().min(1, "Empty message").max(2000),
+  type: z.enum(["TEXT", "EMOJI"]).default("TEXT"),
+});
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -93,24 +84,28 @@ export async function POST(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { slug } = await params;
-  const { text, type = "TEXT" } = await request.json();
 
-  if (!text?.trim()) return NextResponse.json({ error: "Empty message" }, { status: 400 });
+  const parsed = messageSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid message", issues: parsed.error.issues }, { status: 400 });
+  }
 
-  const room = await prisma.room.findFirst({ where: { slug, deletedAt: null } });
-  if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
+  const { room, canPost } = await getRoomAccess(slug, session.user.id);
+  if (!room)    return NextResponse.json({ error: "Room not found" }, { status: 404 });
+  if (!canPost) return NextResponse.json({ error: "You must join this room to chat" }, { status: 403 });
+  if (!room.commChat) return NextResponse.json({ error: "Chat is disabled in this room" }, { status: 403 });
 
   const message = await prisma.message.create({
     data: {
       roomId:   room.id,
       senderId: session.user.id,
-      text:     text.trim(),
-      type:     type as "TEXT" | "SYSTEM" | "EMOJI" | "CONTENT_SHARE",
+      text:     parsed.data.text,
+      type:     parsed.data.type,
     },
     include: { sender: { select: { id: true, name: true, username: true, image: true } } },
   });
 
-  broadcast(slug, { type: "message", message });
+  broadcastChat(slug, { type: "message", message });
 
   return NextResponse.json({ message }, { status: 201 });
 }

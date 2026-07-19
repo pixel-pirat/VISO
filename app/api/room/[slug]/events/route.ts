@@ -2,30 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
+import { z } from "zod";
+import { getRoomAccess } from "@/lib/room-access";
+import { getEventSubscribers, broadcastEvent } from "@/lib/room-events";
 
 // Allow SSE connections to stay open for up to 60s on Vercel Pro
 export const maxDuration = 60;
-
-// In-process event subscriber map for playback sync, reactions, member presence
-declare global {
-  // eslint-disable-next-line no-var
-  var _eventSubscribers: Map<string, Set<ReadableStreamDefaultController>>;
-}
-globalThis._eventSubscribers ??= new Map();
-
-function getSubs(slug: string) {
-  if (!globalThis._eventSubscribers.has(slug)) {
-    globalThis._eventSubscribers.set(slug, new Set());
-  }
-  return globalThis._eventSubscribers.get(slug)!;
-}
-
-export function broadcastEvent(slug: string, data: object) {
-  const payload = `data: ${JSON.stringify(data)}\n\n`;
-  for (const ctrl of getSubs(slug)) {
-    try { ctrl.enqueue(new TextEncoder().encode(payload)); } catch { /* disconnected */ }
-  }
-}
 
 // ── GET — SSE event stream ────────────────────────────────────
 export async function GET(
@@ -37,16 +19,16 @@ export async function GET(
 
   const { slug } = await params;
 
+  const { room, canRead } = await getRoomAccess(slug, session.user.id);
+  if (!room)    return new Response("Room not found", { status: 404 });
+  if (!canRead) return new Response("Forbidden", { status: 403 });
+
   // Current playback state for the new subscriber
-  const room = await prisma.room.findFirst({
-    where: { slug, deletedAt: null },
+  const playbackState = await prisma.roomPlaybackState.findUnique({
+    where: { roomId: room.id },
     include: {
-      playbackState: {
-        include: {
-          roomContent: {
-            include: { content: { select: { title: true, url: true, type: true, duration: true, thumbnailUrl: true } } },
-          },
-        },
+      roomContent: {
+        include: { content: { select: { title: true, url: true, type: true, duration: true, thumbnailUrl: true } } },
       },
     },
   });
@@ -56,11 +38,11 @@ export async function GET(
   const stream = new ReadableStream({
     start(controller) {
       ctrl = controller;
-      getSubs(slug).add(ctrl);
+      getEventSubscribers(slug).add(ctrl);
 
       // Send current playback state immediately
-      if (room?.playbackState) {
-        const init = `data: ${JSON.stringify({ type: "playback_sync", playbackState: room.playbackState })}\n\n`;
+      if (playbackState) {
+        const init = `data: ${JSON.stringify({ type: "playback_sync", playbackState })}\n\n`;
         ctrl.enqueue(new TextEncoder().encode(init));
       }
 
@@ -71,7 +53,7 @@ export async function GET(
 
       request.signal.addEventListener("abort", () => {
         clearInterval(ping);
-        getSubs(slug).delete(ctrl);
+        getEventSubscribers(slug).delete(ctrl);
         try { ctrl.close(); } catch { /* already closed */ }
       });
     },
@@ -87,7 +69,14 @@ export async function GET(
   });
 }
 
-// ── POST — push a generic event (reactions, raise-hand, etc.) ─
+// ── POST — push a client event (reactions, raise-hand) ────────
+// Only whitelisted event types are relayed; playback_sync is broadcast
+// exclusively by the server-side playback route, so clients can't forge it.
+const eventSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("reaction"),   emoji: z.string().min(1).max(16) }),
+  z.object({ type: z.literal("raise_hand"), raised: z.boolean() }),
+]);
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -96,8 +85,16 @@ export async function POST(
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { slug } = await params;
-  const body = await request.json();
 
-  broadcastEvent(slug, { ...body, senderId: session.user.id });
+  const parsed = eventSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid event", issues: parsed.error.issues }, { status: 400 });
+  }
+
+  const { room, canPost } = await getRoomAccess(slug, session.user.id);
+  if (!room)    return NextResponse.json({ error: "Room not found" }, { status: 404 });
+  if (!canPost) return NextResponse.json({ error: "You must join this room first" }, { status: 403 });
+
+  broadcastEvent(slug, { ...parsed.data, senderId: session.user.id });
   return NextResponse.json({ ok: true });
 }

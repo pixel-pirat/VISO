@@ -16,6 +16,12 @@ export const prisma =
         url: process.env.DATABASE_URL,
       },
     },
+    // Secrets never leave the database unless a query opts back in with
+    // `omit: { field: false }` (e.g. the join route checking a passcode).
+    omit: {
+      room: { passcode: true, inviteToken: true },
+      user: { passwordHash: true },
+    },
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 
