@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import {
   Users, Lock, Globe, CheckCircle2, Play,
-  ChevronLeft, ChevronRight, Bell, Plus,
+  ChevronLeft, ChevronRight, Plus,
 } from "lucide-react";
 import type { RoomFilters } from "../page";
 
@@ -147,9 +147,10 @@ function FeaturedHero({ rooms }: { rooms: Room[] }) {
           <span className="text-xs text-neutral-400 font-sans">{room._count.members.toLocaleString()} watching</span>
         </div>
 
-        <button className="mt-4 px-5 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-bold text-white transition-colors font-sans shadow-lg shadow-violet-500/20">
+        <Link href={`/dashboard/rooms/${room.slug}`}
+          className="mt-4 inline-block px-5 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-bold text-white transition-colors font-sans shadow-lg shadow-violet-500/20">
           View Room
-        </button>
+        </Link>
       </div>
 
       {pct > 0 && (
@@ -278,8 +279,10 @@ function RoomCard({ room }: { room: Room }) {
 /* ── Upcoming event card ─────────────────────────────────────── */
 function UpcomingCard({ room }: { room: Room }) {
   const g = grad(room.id);
+  const sched = room.scheduledAt ? new Date(room.scheduledAt) : null;
   return (
-    <div className="flex items-center gap-3 p-3 rounded-xl bg-neutral-900 border border-neutral-800/60 hover:border-violet-500/30 transition-colors cursor-pointer group">
+    <Link href={`/dashboard/rooms/${room.slug}`}
+      className="flex items-center gap-3 p-3 rounded-xl bg-neutral-900 border border-neutral-800/60 hover:border-violet-500/30 transition-colors cursor-pointer group">
       <div className={`w-14 h-14 rounded-xl bg-linear-to-br ${g} shrink-0 flex items-center justify-center overflow-hidden`}>
         <Play className="w-5 h-5 text-white/40" />
       </div>
@@ -294,15 +297,18 @@ function UpcomingCard({ room }: { room: Room }) {
           ))}
         </div>
       </div>
-      <div className="flex flex-col items-end gap-2 shrink-0">
-        <div className="w-7 h-7 rounded-lg bg-neutral-800 flex items-center justify-center text-lg font-extrabold text-white font-sans leading-none">
-          30
+      {sched && (
+        <div className="flex flex-col items-center shrink-0 px-2 py-1.5 rounded-lg bg-neutral-800">
+          <span className="text-base font-extrabold text-white font-sans leading-none">{sched.getDate()}</span>
+          <span className="text-[8px] font-bold text-neutral-500 font-sans uppercase mt-0.5">
+            {sched.toLocaleDateString(undefined, { month: "short" })}
+          </span>
+          <span className="text-[8px] text-amber-400 font-sans mt-0.5">
+            {sched.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+          </span>
         </div>
-        <button className="w-6 h-6 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors">
-          <Bell className="w-3 h-3 text-neutral-500" />
-        </button>
-      </div>
-    </div>
+      )}
+    </Link>
   );
 }
 
@@ -327,11 +333,13 @@ export function RoomsContent({
   filters,
   refreshKey,
   onCreateRoom,
+  onSeeAllMine,
 }: {
   user: { id: string };
   filters: RoomFilters;
   refreshKey: number;
   onCreateRoom: () => void;
+  onSeeAllMine?: () => void;
 }) {
   const [rooms, setRooms]     = useState<Room[]>([]);
   const [loading, setLoading] = useState(true);
@@ -412,7 +420,7 @@ export function RoomsContent({
           {/* My Rooms */}
           {myRooms.length > 0 && (
             <section>
-              <SectionHeader label="My Rooms" action="See all" />
+              <SectionHeader label="My Rooms" action="See all" onAction={onSeeAllMine} />
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
                 {myRooms.slice(0, 5).map((r) => <RoomCard key={r.id} room={r} />)}
               </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronLeft, Mic, MicOff, Video, VideoOff, UserPlus, Radio } from "lucide-react";
+import { ChevronLeft, Mic, MicOff, Video, UserPlus, Check } from "lucide-react";
 import type { RoomInfo } from "../page";
 import type { RoomParticipant } from "./LiveRoom";
 
@@ -17,9 +17,11 @@ interface RoomSidebarProps {
   isHost:        boolean;
   currentUserId: string;
   lkConnected:   boolean;
+  onInvite:      () => void;
+  invited:       boolean;
 }
 
-export function RoomSidebar({ roomInfo, participants, isHost, currentUserId, lkConnected }: RoomSidebarProps) {
+export function RoomSidebar({ roomInfo, participants, isHost, currentUserId, lkConnected, onInvite, invited }: RoomSidebarProps) {
   const audioCount = participants.filter((p) => !p.isMuted).length;
 
   return (
@@ -90,10 +92,13 @@ export function RoomSidebar({ roomInfo, participants, isHost, currentUserId, lkC
         ))}
       </div>
 
-      {/* invite friends button */}
+      {/* invite friends button — copies the room link (with invite token for hosts) */}
       <div className="p-3 border-t border-neutral-800/60 shrink-0">
-        <button className="w-full flex items-center justify-center gap-1.5 py-2 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 rounded-xl text-[10px] font-bold text-violet-300 hover:text-violet-200 transition-colors font-sans">
-          <UserPlus className="w-3 h-3" /> Invite Friends
+        <button onClick={onInvite}
+          className="w-full flex items-center justify-center gap-1.5 py-2 bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 rounded-xl text-[10px] font-bold text-violet-300 hover:text-violet-200 transition-colors font-sans">
+          {invited
+            ? <><Check className="w-3 h-3 text-emerald-400" /> Link Copied!</>
+            : <><UserPlus className="w-3 h-3" /> Invite Friends</>}
         </button>
       </div>
 

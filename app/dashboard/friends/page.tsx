@@ -46,6 +46,12 @@ export default function FriendsPage() {
     if (!isPending && !session) router.push("/login");
   }, [session, isPending, router]);
 
+  // Honor ?tab=pending|search deep links (from notifications, right panel)
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "pending" || t === "search") setTab(t);
+  }, []);
+
   const fetchFriends = useCallback(async () => {
     setLoading(true);
     const res = await fetch("/api/friends");

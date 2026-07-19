@@ -125,7 +125,7 @@ export async function GET() {
               include: {
                 room: {
                   select: {
-                    id: true, name: true,
+                    id: true, name: true, slug: true,
                     playbackState: {
                       include: {
                         roomContent: {
@@ -149,7 +149,7 @@ export async function GET() {
               include: {
                 room: {
                   select: {
-                    id: true, name: true,
+                    id: true, name: true, slug: true,
                     playbackState: {
                       include: {
                         roomContent: {

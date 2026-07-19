@@ -1,6 +1,7 @@
 "use client";
 
-import { Globe, Lock, Settings, Maximize2, Minimize2, UserPlus, LogOut, Radio, Users } from "lucide-react";
+import Link from "next/link";
+import { Globe, Lock, Settings, Maximize2, Minimize2, UserPlus, LogOut, Users, Check } from "lucide-react";
 import type { RoomInfo } from "../page";
 
 interface RoomTopBarProps {
@@ -10,9 +11,11 @@ interface RoomTopBarProps {
   theatreMode:      boolean;
   onToggleTheatre:  () => void;
   onLeave:          () => void;
+  onInvite:         () => void;
+  invited:          boolean;
 }
 
-export function RoomTopBar({ roomInfo, participantCount, isHost, theatreMode, onToggleTheatre, onLeave }: RoomTopBarProps) {
+export function RoomTopBar({ roomInfo, participantCount, isHost, theatreMode, onToggleTheatre, onLeave, onInvite, invited }: RoomTopBarProps) {
   return (
     <header className="h-12 shrink-0 flex items-center justify-between gap-4 px-4 border-b border-neutral-800/60 bg-[#0d0d0f]">
       {/* left — title */}
@@ -42,13 +45,17 @@ export function RoomTopBar({ roomInfo, participantCount, isHost, theatreMode, on
 
       {/* right — actions */}
       <div className="flex items-center gap-2 shrink-0">
-        <button className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-semibold text-neutral-300 hover:text-white transition-colors font-sans">
-          <UserPlus className="w-3.5 h-3.5" /> Invite
+        <button onClick={onInvite}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-semibold text-neutral-300 hover:text-white transition-colors font-sans">
+          {invited
+            ? <><Check className="w-3.5 h-3.5 text-emerald-400" /> Copied!</>
+            : <><UserPlus className="w-3.5 h-3.5" /> Invite</>}
         </button>
         {isHost && (
-          <button className="w-7 h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors">
+          <Link href={`/dashboard/rooms/${roomInfo.slug}`} title="Room settings"
+            className="w-7 h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors">
             <Settings className="w-3.5 h-3.5 text-neutral-400" />
-          </button>
+          </Link>
         )}
         <button onClick={onToggleTheatre}
           className="w-7 h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors"

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Play, ChevronRight, Radio, Users, Lock, CheckCircle2, Flame, Globe } from "lucide-react";
 import type { DashboardData, LiveRoom, ContinueItem, TrendingRoom, FriendActivity } from "../_types/dashboard";
 
@@ -94,7 +96,8 @@ function ContinueCard({ item }: { item: ContinueItem }) {
   const gradient = pickGradient(item.room.id);
 
   return (
-    <div className={`relative shrink-0 w-44 rounded-xl overflow-hidden bg-linear-to-br ${gradient} cursor-pointer group`}>
+    <Link href={`/room/${item.room.slug}`}
+      className={`relative shrink-0 w-44 rounded-xl overflow-hidden bg-linear-to-br ${gradient} cursor-pointer group block`}>
       <div className="aspect-video flex items-center justify-center relative">
         {content?.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -114,12 +117,13 @@ function ContinueCard({ item }: { item: ContinueItem }) {
         </div>
         <p className="text-[10px] text-neutral-400 mt-1 font-sans">{progress}%</p>
       </div>
-    </div>
+    </Link>
   );
 }
 
 /* ── Live Room card ─────────────────────────────────────────── */
 function LiveRoomCard({ room, currentUserId }: { room: LiveRoom; currentUserId: string }) {
+  const router = useRouter();
   const content = room.playbackState?.roomContent?.content;
   const title = content?.title ?? room.name;
   const duration = content?.duration ?? 0;
@@ -127,10 +131,11 @@ function LiveRoomCard({ room, currentUserId }: { room: LiveRoom; currentUserId: 
   const progress = duration > 0 ? Math.min(100, Math.round((currentTime / duration) * 100)) : 0;
   const gradient = pickGradient(room.id);
   const isPrivate = room.visibility === "PRIVATE";
-  const isMember = false; // will be wired via membership check if needed
 
   return (
-    <div className={`shrink-0 w-64 rounded-xl overflow-hidden bg-linear-to-br ${gradient} border border-neutral-700/40 cursor-pointer group`}>
+    <div
+      onClick={() => router.push(`/dashboard/rooms/${room.slug}`)}
+      className={`shrink-0 w-64 rounded-xl overflow-hidden bg-linear-to-br ${gradient} border border-neutral-700/40 cursor-pointer group`}>
       <div className="relative h-32 flex items-center justify-center overflow-hidden">
         {content?.thumbnailUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -153,7 +158,9 @@ function LiveRoomCard({ room, currentUserId }: { room: LiveRoom; currentUserId: 
             Hosted by{" "}
             <span className="text-violet-400 font-semibold">{room.host.username ?? room.host.name}</span>
           </p>
-          <button className="px-3 py-1 bg-violet-600 hover:bg-violet-500 rounded-lg text-[10px] font-bold text-white transition-colors font-sans shrink-0 ml-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); router.push(`/room/${room.slug}`); }}
+            className="px-3 py-1 bg-violet-600 hover:bg-violet-500 rounded-lg text-[10px] font-bold text-white transition-colors font-sans shrink-0 ml-2">
             Join
           </button>
         </div>
@@ -188,7 +195,8 @@ function TrendingCard({ room }: { room: TrendingRoom }) {
   const gradient = pickGradient(room.id);
 
   return (
-    <div className={`shrink-0 w-36 rounded-xl overflow-hidden bg-linear-to-br ${gradient} cursor-pointer group border border-neutral-700/30`}>
+    <Link href={`/dashboard/rooms/${room.slug}`}
+      className={`shrink-0 w-36 rounded-xl overflow-hidden bg-linear-to-br ${gradient} cursor-pointer group border border-neutral-700/30 block`}>
       <div className="relative h-48 flex flex-col justify-end p-3 overflow-hidden">
         {content?.thumbnailUrl && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -201,7 +209,7 @@ function TrendingCard({ room }: { room: TrendingRoom }) {
           {room._count.members.toLocaleString()} watching
         </p>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -238,9 +246,10 @@ function ActivityCard({ friendship, currentUserId }: { friendship: FriendActivit
         )}
       </div>
       {membership && (
-        <button className="w-full py-1.5 bg-violet-600 hover:bg-violet-500 rounded-lg text-[10px] font-bold text-white transition-colors font-sans">
+        <Link href={`/room/${membership.room.slug}`}
+          className="w-full py-1.5 bg-violet-600 hover:bg-violet-500 rounded-lg text-[10px] font-bold text-white transition-colors font-sans text-center block">
           Join
-        </button>
+        </Link>
       )}
     </div>
   );

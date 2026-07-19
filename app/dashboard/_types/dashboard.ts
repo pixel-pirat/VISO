@@ -35,6 +35,7 @@ export type ContinueItem = {
   room: {
     id: string;
     name: string;
+    slug: string;
     _count: { members: number };
     playbackState: {
       currentTime: number;
@@ -95,6 +96,7 @@ export type FriendActivity = {
       room: {
         id: string;
         name: string;
+        slug: string;
         playbackState: {
           roomContent: { content: { title: string } } | null;
         } | null;
@@ -107,6 +109,7 @@ export type FriendActivity = {
       room: {
         id: string;
         name: string;
+        slug: string;
         playbackState: {
           roomContent: { content: { title: string } } | null;
         } | null;

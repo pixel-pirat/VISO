@@ -27,6 +27,18 @@ export default function RoomsPage() {
     if (!isPending && !session) router.push("/login");
   }, [session, isPending, router]);
 
+  // Honor ?create=1 and ?search= from Topbar shortcuts on other pages
+  // (window.location instead of useSearchParams to avoid a Suspense boundary)
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("create") === "1") setShowCreate(true);
+    const search = sp.get("search");
+    if (search) setFilters((f) => ({ ...f, search }));
+    if (sp.get("create") || search) {
+      window.history.replaceState(null, "", "/dashboard/rooms");
+    }
+  }, []);
+
   const handleCreated = useCallback(() => {
     setShowCreate(false);
     setRefreshKey((k) => k + 1);
@@ -65,6 +77,7 @@ export default function RoomsPage() {
             filters={filters}
             refreshKey={refreshKey}
             onCreateRoom={() => setShowCreate(true)}
+            onSeeAllMine={() => setFilters((f) => ({ ...f, type: "mine" }))}
           />
 
           {/* right filters panel */}

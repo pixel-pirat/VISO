@@ -1,6 +1,8 @@
 "use client";
 
-import { Bell, MessageCircle, UserPlus } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { MessageCircle, UserPlus } from "lucide-react";
 import type { AppNotification, FriendshipWithUsers } from "../_types/dashboard";
 
 const AVATAR_GRADIENTS = [
@@ -63,7 +65,21 @@ export function RightPanel({
   currentUserId: string;
   onNotificationsRead: () => void;
 }) {
+  const router = useRouter();
   const unread = notifications.filter((n) => !n.isRead);
+
+  // Open (or create) a DM room with a friend, then jump to the chat page
+  const messageFriend = async (friendId: string) => {
+    try {
+      const res  = await fetch("/api/friends/dm", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ friendId }),
+      });
+      const data = await res.json();
+      if (data.slug) router.push(`/dashboard/chat?room=${data.slug}`);
+    } catch { /* ignore */ }
+  };
 
   // Resolve the "other" user from each friendship
   const friends = onlineFriends.map((f) =>
@@ -104,14 +120,19 @@ export function RightPanel({
           </div>
         )}
         {notifications.length > 0 && (
-          <button className="mt-3 w-full py-2 rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 text-[10px] font-semibold text-neutral-400 hover:text-white transition-colors font-sans">
+          <Link href="/dashboard/notifications"
+            className="mt-3 w-full py-2 rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 text-[10px] font-semibold text-neutral-400 hover:text-white transition-colors font-sans flex items-center justify-center">
             View all notifications
-          </button>
+          </Link>
         )}
       </PanelSection>
 
       {/* Online Friends */}
-      <PanelSection title={`Online Friends${onlineNow.length > 0 ? ` (${onlineNow.length})` : ""}`} action="See all">
+      <PanelSection
+        title={`Online Friends${onlineNow.length > 0 ? ` (${onlineNow.length})` : ""}`}
+        action="See all"
+        onAction={() => router.push("/dashboard/friends")}
+      >
         {allFriends.length === 0 ? (
           <EmptyState label="No friends yet. Invite someone!" />
         ) : (
@@ -138,6 +159,7 @@ export function RightPanel({
                     </p>
                   </div>
                   <button
+                    onClick={() => messageFriend(f.id)}
                     className="w-5 h-5 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors shrink-0"
                     title="Message"
                   >
@@ -153,9 +175,10 @@ export function RightPanel({
       {/* Invite Friends */}
       <PanelSection title="Invite Friends">
         <p className="text-[10px] text-neutral-500 font-sans mb-3">Get more friends on VISO</p>
-        <button className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 text-[10px] font-semibold text-neutral-300 hover:text-white transition-colors font-sans">
+        <Link href="/dashboard/friends?tab=search"
+          className="flex items-center justify-center gap-2 w-full py-2 rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 text-[10px] font-semibold text-neutral-300 hover:text-white transition-colors font-sans">
           <UserPlus className="w-3 h-3" /> Invite Friends
-        </button>
+        </Link>
       </PanelSection>
 
     </aside>

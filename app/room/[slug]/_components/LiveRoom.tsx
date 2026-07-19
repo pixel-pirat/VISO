@@ -55,6 +55,23 @@ export type RoomParticipant = {
 
 export type Reaction = { emoji: string; senderId: string; id: number };
 
+// ── Polls & Q&A (session-scoped, synced over the LiveKit data channel) ──
+export type PollState = {
+  id: string;
+  question: string;
+  options: string[];
+  votes: Record<string, number>;   // participant identity → option index
+  open: boolean;
+};
+
+export type QAItem = {
+  id: string;
+  text: string;
+  authorId: string;
+  authorName: string;
+  answered: boolean;
+};
+
 interface LiveRoomProps {
   joinData:    JoinData;
   currentUser: { id: string; name: string; username: string | null; image: string | null };
@@ -118,7 +135,28 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
   const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({
     "❤️": 0, "😂": 0, "🔥": 0, "😮": 0, "👏": 0,
   });
+  const [showReactionBar, setShowReactionBar] = useState(true);
   const reactionIdRef = useRef(0);
+
+  /* ── Polls & Q&A ── */
+  const [poll,      setPoll]      = useState<PollState | null>(null);
+  const [questions, setQuestions] = useState<QAItem[]>([]);
+  const pollRef = useRef<PollState | null>(null);
+  const qaRef   = useRef<QAItem[]>([]);
+  useEffect(() => { pollRef.current = poll; },      [poll]);
+  useEffect(() => { qaRef.current   = questions; }, [questions]);
+
+  /* ── Invite link (copied-state feedback) ── */
+  const [invited, setInvited] = useState(false);
+  const copyInvite = useCallback(() => {
+    const url = `${window.location.origin}/room/${roomInfo.slug}${
+      roomInfo.inviteToken ? `?invite=${roomInfo.inviteToken}` : ""
+    }`;
+    navigator.clipboard?.writeText(url).then(() => {
+      setInvited(true);
+      setTimeout(() => setInvited(false), 2000);
+    }).catch(() => {});
+  }, [roomInfo.slug, roomInfo.inviteToken]);
 
   /* ── Ref to the video element (set by VideoPlayer via onVideoRef) ── */
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -201,6 +239,55 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
               })),
               { reliable: true }
             );
+            // Also bring the late joiner up to speed on polls & Q&A
+            lkRoom.localParticipant.publishData(
+              new TextEncoder().encode(JSON.stringify({
+                type: "room_state",
+                poll: pollRef.current,
+                questions: qaRef.current,
+              })),
+              { reliable: true }
+            );
+          }
+
+          // ── Polls (poll_start/poll_end only honored from the host) ──
+          const senderIsHost = participant?.identity === hostIdRef.current;
+          if (msg.type === "poll_start" && senderIsHost && msg.poll) {
+            setPoll({ id: msg.poll.id, question: msg.poll.question, options: msg.poll.options ?? [], votes: {}, open: true });
+          }
+          if (msg.type === "poll_end" && senderIsHost) {
+            setPoll((p) => (p && p.id === msg.pollId ? { ...p, open: false } : p));
+          }
+          if (msg.type === "poll_vote" && participant) {
+            setPoll((p) =>
+              p && p.id === msg.pollId && p.open && typeof msg.option === "number"
+                ? { ...p, votes: { ...p.votes, [participant.identity]: msg.option } }
+                : p
+            );
+          }
+
+          // ── Q&A ──
+          if (msg.type === "qa_question" && participant && typeof msg.text === "string" && msg.text.trim()) {
+            setQuestions((prev) =>
+              prev.some((q) => q.id === msg.id)
+                ? prev
+                : [...prev, {
+                    id: String(msg.id),
+                    text: msg.text.slice(0, 300),
+                    authorId: participant.identity,
+                    authorName: participant.name ?? participant.identity,
+                    answered: false,
+                  }]
+            );
+          }
+          if (msg.type === "qa_answered" && senderIsHost) {
+            setQuestions((prev) => prev.map((q) => (q.id === msg.id ? { ...q, answered: true } : q)));
+          }
+
+          // ── Late-joiner snapshot from the host ──
+          if (msg.type === "room_state" && senderIsHost && !isHostRef.current) {
+            if (msg.poll) setPoll(msg.poll);
+            if (Array.isArray(msg.questions) && msg.questions.length) setQuestions(msg.questions);
           }
 
           // ── Reactions ──────────────────────────────────────────
@@ -357,6 +444,52 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
     });
   }, [chatInput, roomInfo.slug]);
 
+  /* ── Polls & Q&A actions (publish + apply locally — LiveKit doesn't echo
+        your own data messages back to you) ── */
+  const publishData = useCallback((data: object) => {
+    lkRoomRef.current?.localParticipant.publishData(
+      new TextEncoder().encode(JSON.stringify(data)),
+      { reliable: true }
+    );
+  }, []);
+
+  const createPoll = useCallback((question: string, options: string[]) => {
+    if (!isHost) return;
+    const p: PollState = { id: crypto.randomUUID(), question, options, votes: {}, open: true };
+    setPoll(p);
+    publishData({ type: "poll_start", poll: { id: p.id, question, options } });
+  }, [isHost, publishData]);
+
+  const endPoll = useCallback(() => {
+    if (!isHost || !pollRef.current) return;
+    publishData({ type: "poll_end", pollId: pollRef.current.id });
+    setPoll((p) => (p ? { ...p, open: false } : p));
+  }, [isHost, publishData]);
+
+  const votePoll = useCallback((option: number) => {
+    const p = pollRef.current;
+    if (!p || !p.open) return;
+    setPoll((prev) => (prev ? { ...prev, votes: { ...prev.votes, [currentUser.id]: option } } : prev));
+    publishData({ type: "poll_vote", pollId: p.id, option });
+  }, [currentUser.id, publishData]);
+
+  const askQuestion = useCallback((text: string) => {
+    const trimmed = text.trim().slice(0, 300);
+    if (!trimmed) return;
+    const id = crypto.randomUUID();
+    setQuestions((prev) => [...prev, {
+      id, text: trimmed, authorId: currentUser.id,
+      authorName: currentUser.name, answered: false,
+    }]);
+    publishData({ type: "qa_question", id, text: trimmed });
+  }, [currentUser.id, currentUser.name, publishData]);
+
+  const markAnswered = useCallback((id: string) => {
+    if (!isHost) return;
+    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, answered: true } : q)));
+    publishData({ type: "qa_answered", id });
+  }, [isHost, publishData]);
+
   /* ── Host playback control ── broadcasts via LiveKit data channel ── */
   const controlPlayback = useCallback((update: Partial<{ isPlaying: boolean; currentTime: number; speed: number; roomContentId: string }>) => {
     if (!isHost) return;
@@ -387,6 +520,8 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
         isHost={isHost}
         currentUserId={currentUser.id}
         lkConnected={lkConnected}
+        onInvite={copyInvite}
+        invited={invited}
       />
 
       {/* ── Centre: video player + participant grid + controls ── */}
@@ -398,6 +533,8 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
           theatreMode={theatreMode}
           onToggleTheatre={() => setTheatreMode((v) => !v)}
           onLeave={onLeave}
+          onInvite={copyInvite}
+          invited={invited}
         />
 
         {/* main content area */}
@@ -422,19 +559,20 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
               ))}
             </div>
 
-            {/* reaction bar (bottom of player) */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/50 backdrop-blur px-3 py-1.5 rounded-full z-10">
-              {EMOJI_LIST.map((emoji) => (
-                <button key={emoji} onClick={() => sendReaction(emoji)}
-                  className="flex items-center gap-1 hover:scale-125 transition-transform">
-                  <span className="text-base">{emoji}</span>
-                  {(reactionCounts[emoji] ?? 0) > 0 && (
-                    <span className="text-[9px] text-neutral-300 font-bold font-sans">{reactionCounts[emoji]}</span>
-                  )}
-                </button>
-              ))}
-              <button className="text-neutral-500 hover:text-white transition-colors text-lg ml-1">+</button>
-            </div>
+            {/* reaction bar (bottom of player) — toggled via the Reactions control */}
+            {showReactionBar && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/50 backdrop-blur px-3 py-1.5 rounded-full z-10">
+                {EMOJI_LIST.map((emoji) => (
+                  <button key={emoji} onClick={() => sendReaction(emoji)}
+                    className="flex items-center gap-1 hover:scale-125 transition-transform">
+                    <span className="text-base">{emoji}</span>
+                    {(reactionCounts[emoji] ?? 0) > 0 && (
+                      <span className="text-[9px] text-neutral-300 font-bold font-sans">{reactionCounts[emoji]}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* participant video grid */}
@@ -454,11 +592,12 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
           isHost={isHost}
           commAudio={roomInfo.commAudio}
           commVideo={roomInfo.commVideo}
+          reactionBarVisible={showReactionBar}
           onToggleMic={toggleMic}
           onToggleCamera={toggleCamera}
           onToggleScreenShare={toggleScreenShare}
           onRaiseHand={raiseHand}
-          onOpenReactions={() => {/* handled inline */}}
+          onOpenReactions={() => setShowReactionBar((v) => !v)}
           onLeave={onLeave}
         />
       </div>
@@ -474,6 +613,17 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
         setActiveTab={setActiveTab}
         roomInfo={roomInfo}
         currentUserId={currentUser.id}
+        isHost={isHost}
+        onReaction={sendReaction}
+        onInvite={copyInvite}
+        invited={invited}
+        poll={poll}
+        onCreatePoll={createPoll}
+        onVotePoll={votePoll}
+        onEndPoll={endPoll}
+        questions={questions}
+        onAskQuestion={askQuestion}
+        onMarkAnswered={markAnswered}
       />
 
       <style jsx global>{`

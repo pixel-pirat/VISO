@@ -3,7 +3,7 @@
 import {
   Mic, MicOff, Video, VideoOff,
   MonitorUp, MonitorStop, Hand, Smile,
-  Settings, PhoneOff,
+  PhoneOff,
 } from "lucide-react";
 
 interface ControlBarProps {
@@ -14,6 +14,7 @@ interface ControlBarProps {
   isHost:         boolean;
   commAudio:      boolean;
   commVideo:      boolean;
+  reactionBarVisible: boolean;
   onToggleMic:    () => void;
   onToggleCamera: () => void;
   onToggleScreenShare: () => void;
@@ -44,7 +45,7 @@ function CtrlBtn({
 
 export function ControlBar({
   isMuted, isVideoOff, isScreenSharing, handRaised, isHost,
-  commAudio, commVideo,
+  commAudio, commVideo, reactionBarVisible,
   onToggleMic, onToggleCamera, onToggleScreenShare, onRaiseHand, onOpenReactions, onLeave,
 }: ControlBarProps) {
   return (
@@ -82,14 +83,9 @@ export function ControlBar({
       <CtrlBtn
         icon={Smile}
         label="Reactions"
-        title="Send a reaction"
+        title={reactionBarVisible ? "Hide reaction bar" : "Show reaction bar"}
+        active={reactionBarVisible}
         onClick={onOpenReactions}
-      />
-      <CtrlBtn
-        icon={Settings}
-        label="Settings"
-        title="Settings"
-        onClick={() => {}}
       />
 
       {/* spacer */}
