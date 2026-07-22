@@ -95,6 +95,6 @@ export async function POST(
   if (!room)    return NextResponse.json({ error: "Room not found" }, { status: 404 });
   if (!canPost) return NextResponse.json({ error: "You must join this room first" }, { status: 403 });
 
-  broadcastEvent(slug, { ...parsed.data, senderId: session.user.id });
+  await broadcastEvent(slug, { ...parsed.data, senderId: session.user.id });
   return NextResponse.json({ ok: true });
 }

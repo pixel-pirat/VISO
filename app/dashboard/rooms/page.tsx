@@ -64,7 +64,6 @@ export default function RoomsPage() {
       <div className="flex flex-col flex-1 min-w-0">
         <Topbar
           user={user}
-          unreadCount={0}
           onCreateRoom={() => setShowCreate(true)}
           searchValue={filters.search}
           onSearchChange={(v) => setFilters((f) => ({ ...f, search: v }))}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, Plus, Search } from "lucide-react";
@@ -9,18 +9,30 @@ type User = { name: string | null; email: string; image?: string | null };
 
 interface TopbarProps {
   user: User;
-  unreadCount: number;
   onCreateRoom?: () => void;
   searchValue?: string;
   onSearchChange?: (value: string) => void;
 }
 
-export function Topbar({ user, unreadCount, onCreateRoom, searchValue, onSearchChange }: TopbarProps) {
+export function Topbar({ user, onCreateRoom, searchValue, onSearchChange }: TopbarProps) {
   const router = useRouter();
   // Fallback search state for pages that don't control the input themselves —
   // typing + Enter jumps to the rooms page with the query applied.
   const [localSearch, setLocalSearch] = useState("");
   const controlled = onSearchChange !== undefined;
+
+  // Live unread count — the stream's first message carries the current
+  // count, then pushes updates as notifications arrive or get marked read.
+  const [unreadCount, setUnreadCount] = useState(0);
+  useEffect(() => {
+    const es = new EventSource("/api/notifications/stream");
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (typeof data.unreadCount === "number") setUnreadCount(data.unreadCount);
+    };
+    es.onerror = () => es.close();
+    return () => es.close();
+  }, []);
 
   const today = new Date().toLocaleDateString("en-GB", {
     day: "numeric", month: "long", year: "numeric",

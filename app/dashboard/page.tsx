@@ -32,6 +32,23 @@ export default function DashboardPage() {
       .finally(() => setDataLoading(false));
   }, [session]);
 
+  // Live updates — prepend new notifications into the right panel's list
+  // as they arrive instead of waiting for the next full page load.
+  useEffect(() => {
+    if (!session) return;
+    const es = new EventSource("/api/notifications/stream");
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === "notification" && data.notification) {
+        setDashData((prev) =>
+          prev ? { ...prev, notifications: [data.notification, ...prev.notifications] } : prev
+        );
+      }
+    };
+    es.onerror = () => es.close();
+    return () => es.close();
+  }, [session]);
+
   if (isPending || !session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#111113]">
@@ -49,10 +66,7 @@ export default function DashboardPage() {
     <div className="flex h-screen bg-[#111113] text-neutral-200 overflow-hidden">
       <Sidebar user={user} />
       <div className="flex flex-col flex-1 min-w-0">
-        <Topbar
-          user={user}
-          unreadCount={dashData?.notifications.filter((n) => !n.isRead).length ?? 0}
-        />
+        <Topbar user={user} />
         <div className="flex flex-1 min-h-0">
           <MainFeed
             user={user}

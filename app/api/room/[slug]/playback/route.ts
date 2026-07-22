@@ -70,7 +70,7 @@ export async function PATCH(
   }
 
   // Broadcast to all SSE subscribers
-  broadcastEvent(slug, { type: "playback_sync", playbackState: updated });
+  await broadcastEvent(slug, { type: "playback_sync", playbackState: updated });
 
   return NextResponse.json({ playbackState: updated });
 }

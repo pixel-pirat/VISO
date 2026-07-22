@@ -105,7 +105,7 @@ export async function POST(
     include: { sender: { select: { id: true, name: true, username: true, image: true } } },
   });
 
-  broadcastChat(slug, { type: "message", message });
+  await broadcastChat(slug, { type: "message", message });
 
   return NextResponse.json({ message }, { status: 201 });
 }

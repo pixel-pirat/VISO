@@ -144,7 +144,7 @@ function ChatPageInner() {
     <div className="flex h-screen bg-[#111113] text-neutral-200 overflow-hidden">
       <Sidebar user={session.user} />
       <div className="flex flex-col flex-1 min-w-0">
-        <Topbar user={session.user} unreadCount={0} />
+        <Topbar user={session.user} />
 
         <div className="flex flex-1 min-h-0">
           {/* ── Left: friends list — full-width on mobile, hidden once a conversation is open ── */}

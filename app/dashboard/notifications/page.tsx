@@ -72,6 +72,23 @@ export default function NotificationsPage() {
       .catch(() => setLoading(false));
   }, [session]);
 
+  // Live updates — a new notification arriving while this page is open
+  // prepends it immediately instead of waiting for a manual refresh.
+  useEffect(() => {
+    if (!session) return;
+    const es = new EventSource("/api/notifications/stream");
+    es.onmessage = (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === "notification" && data.notification) {
+        setNotifications((prev) =>
+          prev.some((n) => n.id === data.notification.id) ? prev : [data.notification, ...prev]
+        );
+      }
+    };
+    es.onerror = () => es.close();
+    return () => es.close();
+  }, [session]);
+
   const markAllRead = useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     fetch("/api/notifications/read", { method: "PATCH" }).catch(() => {});
@@ -96,7 +113,7 @@ export default function NotificationsPage() {
     <div className="flex h-screen bg-[#111113] text-neutral-200 overflow-hidden">
       <Sidebar user={session.user} />
       <div className="flex flex-col flex-1 min-w-0">
-        <Topbar user={session.user} unreadCount={unread} />
+        <Topbar user={session.user} />
 
         <div className="flex-1 overflow-y-auto scrollbar-hide">
           <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6">

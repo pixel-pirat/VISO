@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
+import { sendNotification } from "@/lib/notify";
 
 // GET /api/friends — list all friendships for current user
 export async function GET() {
@@ -70,15 +71,13 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Create a notification for the addressee
-  await prisma.notification.create({
-    data: {
-      userId:  addresseeId,
-      title:   "Friend Request",
-      message: `${session.user.name ?? "Someone"} sent you a friend request`,
-      type:    "FRIEND_REQUEST",
-      payload: { friendshipId: friendship.id, requesterId },
-    },
+  // Create a notification for the addressee — delivered live over SSE
+  await sendNotification({
+    userId:  addresseeId,
+    title:   "Friend Request",
+    message: `${session.user.name ?? "Someone"} sent you a friend request`,
+    type:    "FRIEND_REQUEST",
+    payload: { friendshipId: friendship.id, requesterId },
   });
 
   return NextResponse.json({ friendship }, { status: 201 });
