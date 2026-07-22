@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
@@ -26,8 +26,9 @@ export async function PATCH(request: NextRequest) {
   }
 
   // Push the new unread count so the badge drops live, including on other
-  // open tabs/devices for this user.
-  await publishUnreadCount(userId);
+  // open tabs/devices for this user — deferred so this response (which the
+  // caller already applies optimistically) never waits on Redis.
+  after(() => publishUnreadCount(userId));
 
   return NextResponse.json({ ok: true });
 }

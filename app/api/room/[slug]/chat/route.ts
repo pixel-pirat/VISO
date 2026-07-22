@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
@@ -105,7 +105,11 @@ export async function POST(
     include: { sender: { select: { id: true, name: true, username: true, image: true } } },
   });
 
-  await broadcastChat(slug, { type: "message", message });
+  // Respond as soon as the message is persisted — the Redis round-trip for
+  // realtime fan-out runs after the response is sent (via next/server's
+  // after()), so a slow/cold Redis connection never adds latency to the
+  // sender's own "message sent" experience.
+  after(() => broadcastChat(slug, { type: "message", message }));
 
   return NextResponse.json({ message }, { status: 201 });
 }

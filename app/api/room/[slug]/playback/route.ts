@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
@@ -69,8 +69,9 @@ export async function PATCH(
     });
   }
 
-  // Broadcast to all SSE subscribers
-  await broadcastEvent(slug, { type: "playback_sync", playbackState: updated });
+  // Broadcast to all SSE subscribers — deferred so the host's own playback
+  // controls (play/pause/seek) never wait on the Redis round-trip
+  after(() => broadcastEvent(slug, { type: "playback_sync", playbackState: updated }));
 
   return NextResponse.json({ playbackState: updated });
 }

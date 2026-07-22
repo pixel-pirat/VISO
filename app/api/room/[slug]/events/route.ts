@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
@@ -95,6 +95,6 @@ export async function POST(
   if (!room)    return NextResponse.json({ error: "Room not found" }, { status: 404 });
   if (!canPost) return NextResponse.json({ error: "You must join this room first" }, { status: 403 });
 
-  await broadcastEvent(slug, { ...parsed.data, senderId: session.user.id });
+  after(() => broadcastEvent(slug, { ...parsed.data, senderId: session.user.id }));
   return NextResponse.json({ ok: true });
 }

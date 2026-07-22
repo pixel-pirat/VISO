@@ -351,8 +351,11 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
 
     es.onmessage = (e) => {
       const data = JSON.parse(e.data);
-      if (data.type === "history")  setMessages(data.messages);
-      if (data.type === "message")  setMessages((prev) => [...prev, data.message]);
+      if (data.type === "history") setMessages(data.messages);
+      // Dedupe against the optimistic copy sendChat already appended
+      if (data.type === "message") {
+        setMessages((prev) => (prev.some((m) => m.id === data.message.id) ? prev : [...prev, data.message]));
+      }
     };
     es.onerror = () => es.close();
 
@@ -437,16 +440,36 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
   }, [currentUser.id, roomInfo.slug]);
 
   /* ── Send chat message ── */
+  // Appends an optimistic bubble immediately instead of waiting on the
+  // round trip (DB write + realtime fan-out) — reconciled with the real
+  // message once the POST resolves, removed if it fails.
   const sendChat = useCallback(async () => {
     const text = chatInput.trim();
     if (!text) return;
     setChatInput("");
-    await fetch(`/api/room/${roomInfo.slug}/chat`, {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ text }),
-    });
-  }, [chatInput, roomInfo.slug]);
+
+    const tempId = `temp-${crypto.randomUUID()}`;
+    setMessages((prev) => [...prev, {
+      id: tempId,
+      text,
+      createdAt: new Date().toISOString(),
+      sender: { id: currentUser.id, name: currentUser.name, username: currentUser.username, image: currentUser.image },
+    }]);
+
+    try {
+      const res = await fetch(`/api/room/${roomInfo.slug}/chat`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error("send failed");
+      const data = await res.json();
+      setMessages((prev) => prev.map((m) => (m.id === tempId ? data.message : m)));
+    } catch {
+      setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      setChatInput(text);
+    }
+  }, [chatInput, roomInfo.slug, currentUser.id, currentUser.name, currentUser.username, currentUser.image]);
 
   /* ── Polls & Q&A actions (publish + apply locally — LiveKit doesn't echo
         your own data messages back to you) ── */

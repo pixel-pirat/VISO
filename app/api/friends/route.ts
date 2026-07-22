@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
@@ -71,14 +71,16 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Create a notification for the addressee — delivered live over SSE
-  await sendNotification({
+  // Create a notification for the addressee — delivered live over SSE.
+  // Deferred: it's not part of this response, so it shouldn't make the
+  // requester wait on the addressee's notification being written/pushed.
+  after(() => sendNotification({
     userId:  addresseeId,
     title:   "Friend Request",
     message: `${session.user.name ?? "Someone"} sent you a friend request`,
     type:    "FRIEND_REQUEST",
     payload: { friendshipId: friendship.id, requesterId },
-  });
+  }));
 
   return NextResponse.json({ friendship }, { status: 201 });
 }

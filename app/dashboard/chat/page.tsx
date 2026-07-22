@@ -61,16 +61,25 @@ function ChatPageInner() {
       .catch(() => setLF(false));
   }, [session]);
 
-  // Open a DM with a friend
+  // Open a DM with a friend — switches to the conversation view immediately
+  // rather than waiting for the room lookup/creation round-trip, so opening
+  // a chat feels instant even if that request is slow (e.g. a cold-started
+  // DB connection). The message list shows its own loading state until the
+  // room resolves and the SSE connection effect below picks it up.
   const openDM = useCallback(async (friend: FUser) => {
+    setActiveFriend(friend);
+    setActiveRoom(null);
+    setMessages([]);
     setOpeningDM(friend.id);
-    const res  = await fetch("/api/friends/dm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ friendId: friend.id }) });
-    const data = await res.json();
-    setOpeningDM(null);
-    if (data.slug) {
-      setActiveRoom(data.slug);
-      setActiveFriend(friend);
-      router.replace(`/dashboard/chat?room=${data.slug}`, { scroll: false });
+    try {
+      const res  = await fetch("/api/friends/dm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ friendId: friend.id }) });
+      const data = await res.json();
+      if (data.slug) {
+        setActiveRoom(data.slug);
+        router.replace(`/dashboard/chat?room=${data.slug}`, { scroll: false });
+      }
+    } finally {
+      setOpeningDM(null);
     }
   }, [router]);
 
@@ -108,8 +117,13 @@ function ChatPageInner() {
 
     es.onmessage = (e) => {
       const data = JSON.parse(e.data);
-      if (data.type === "history")  setMessages(data.messages);
-      if (data.type === "message")  setMessages(prev => [...prev, data.message]);
+      if (data.type === "history") setMessages(data.messages);
+      // Dedupe against the optimistic copy sendMessage already appended —
+      // by the time this echo arrives, the real message is usually already
+      // showing (reconciled from the POST response).
+      if (data.type === "message") {
+        setMessages(prev => prev.some(m => m.id === data.message.id) ? prev : [...prev, data.message]);
+      }
     };
     es.onerror = () => es.close();
 
@@ -123,15 +137,42 @@ function ChatPageInner() {
 
   const sendMessage = async () => {
     const text = input.trim();
-    if (!text || !activeRoom || sending) return;
+    if (!text || !activeRoom || sending || !session) return;
     setInput("");
     setSending(true);
-    await fetch(`/api/room/${activeRoom}/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
-    setSending(false);
+
+    // Optimistic bubble — shows instantly instead of waiting on the round
+    // trip (DB write + realtime fan-out). Reconciled with the real message
+    // once the POST resolves; removed if it fails.
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const optimistic: ChatMsg = {
+      id: tempId,
+      text,
+      createdAt: new Date().toISOString(),
+      sender: {
+        id:       currentUserId,
+        name:     session.user.name ?? null,
+        username: (session.user as { username?: string }).username ?? null,
+        image:    session.user.image ?? null,
+      },
+    };
+    setMessages(prev => [...prev, optimistic]);
+
+    try {
+      const res = await fetch(`/api/room/${activeRoom}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error("send failed");
+      const data = await res.json();
+      setMessages(prev => prev.map(m => (m.id === tempId ? data.message : m)));
+    } catch {
+      setMessages(prev => prev.filter(m => m.id !== tempId));
+      setInput(text); // give the text back so nothing is lost
+    } finally {
+      setSending(false);
+    }
   };
 
   if (isPending || !session) {
@@ -220,7 +261,11 @@ function ChatPageInner() {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto scrollbar-hide px-3 md:px-4 py-4 space-y-3">
-                {messages.length === 0 ? (
+                {!activeRoom ? (
+                  <div className="flex flex-col items-center justify-center h-full gap-3">
+                    <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
+                  </div>
+                ) : messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full gap-3">
                     <Avatar user={activeFriend} size="md" />
                     <p className="text-sm text-neutral-500 font-sans">Say hi to <span className="text-white font-semibold">{activeFriend.name}</span></p>
