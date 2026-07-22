@@ -138,18 +138,16 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // If a video was uploaded, create a Content record and queue it in the room
+  // If a video was uploaded, create a Content record and queue it in the room.
+  // videoUrl is a Livepeer asset id placeholder until transcoding finishes —
+  // /api/livepeer/status (polling) and /api/livepeer/webhook (push) both
+  // replace it with the real HLS URL once the asset is ready.
   if (videoUrl) {
-    // Mux upload IDs are alphanumeric strings (not URLs yet).
-    // The webhook will update the URL to the real HLS stream once transcoding is done.
-    const isMuxId = !videoUrl.startsWith("http") && !videoUrl.startsWith("/") && !videoUrl.startsWith("data:");
-
     const content = await prisma.content.create({
       data: {
         title:        contentTitle || name,
         url:          videoUrl,
-        // Always HLS — Mux transcodes everything to HLS regardless of input format
-        type:         "HLS",
+        type:         "HLS", // transcoding always outputs HLS regardless of input format
         thumbnailUrl: coverUrl || null,
         addedById:    userId,
         isPublic:     visibility === "PUBLIC",
@@ -162,7 +160,7 @@ export async function POST(request: NextRequest) {
         contentId:  content.id,
         queueOrder: 1,
         addedById:  userId,
-        status:     isMuxId ? "QUEUED" : "QUEUED",
+        status:     "QUEUED",
       },
     });
   }

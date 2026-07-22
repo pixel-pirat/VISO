@@ -17,7 +17,10 @@ function fmtTime(s: number) {
     : `${m}:${String(sec).padStart(2,"0")}`;
 }
 
-function isMuxUploadId(url: string): boolean {
+// True while `url` is still a provider-side asset/upload id placeholder
+// rather than a real playable URL (see /api/rooms/upload and
+// /api/livepeer/status — the placeholder is replaced once transcoding finishes).
+function isPendingUploadId(url: string): boolean {
   return Boolean(url) && !url.startsWith("http") && !url.startsWith("/") &&
     !url.startsWith("data:") && url.length > 10 && /^[a-zA-Z0-9_-]+$/.test(url);
 }
@@ -54,9 +57,8 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
   const rawContent  = playbackState?.roomContent?.content ?? queue[0]?.content ?? null;
   const contentUrl  = resolvedUrl ?? rawContent?.url ?? null;
   const contentType = rawContent?.type ?? "HLS";
-  const pending     = Boolean(contentUrl && isMuxUploadId(contentUrl));
+  const pending     = Boolean(contentUrl && isPendingUploadId(contentUrl));
   const isHLS       = !pending && (
-    contentUrl?.includes("stream.mux.com") ||
     contentUrl?.endsWith(".m3u8") ||
     contentType === "HLS"
   );
@@ -70,7 +72,7 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ── Poll Mux status ── */
+  /* ── Poll transcoding status ── */
   useEffect(() => {
     if (!pending || !contentUrl) {
       pollRef.current && clearInterval(pollRef.current);
@@ -80,7 +82,7 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
     const id = contentUrl;
     const check = async () => {
       try {
-        const d = await fetch(`/api/mux/status/${id}`).then(r => r.json());
+        const d = await fetch(`/api/livepeer/status/${id}`).then(r => r.json());
         if (d.status === "ready" && d.url) {
           setResolvedUrl(d.url);
           setProcessing(false);

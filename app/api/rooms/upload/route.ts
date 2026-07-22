@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { createUpload } from "@/lib/livepeer";
 
 const ALLOWED_IMAGE = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -31,35 +32,20 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Not a supported video format." }, { status: 415 });
       }
 
-      const muxTokenId     = process.env.MUX_TOKEN_ID;
-      const muxTokenSecret = process.env.MUX_TOKEN_SECRET;
-      if (!muxTokenId || !muxTokenSecret) {
+      if (!process.env.LIVEPEER_API_KEY) {
         return NextResponse.json(
-          { error: "Video upload is not configured — MUX_TOKEN_ID and MUX_TOKEN_SECRET are missing." },
+          { error: "Video upload is not configured — LIVEPEER_API_KEY is missing." },
           { status: 503 }
         );
       }
 
-      const { default: Mux } = await import("@mux/mux-node");
-      const mux    = new Mux({ tokenId: muxTokenId, tokenSecret: muxTokenSecret });
-      const origin = request.headers.get("origin") ?? "https://viso-theatre.vercel.app";
-
-      const upload = await mux.video.uploads.create({
-        cors_origin: origin,
-        new_asset_settings: {
-          playback_policy: ["public"],
-          // "smart" picks the fastest encoder for the input — much quicker than "baseline"
-          encoding_tier:   "smart",
-          mp4_support:     "capped-1080p",
-        },
-      });
+      const upload = await createUpload(filename || "room-upload");
 
       return NextResponse.json({
         type:      "video",
-        mux:       true,
-        uploadId:  upload.id,
-        uploadUrl: upload.url,
-        url:       upload.id,  // placeholder until webhook fires
+        uploadId:  upload.assetId,
+        uploadUrl: upload.uploadUrl,
+        url:       upload.assetId,  // placeholder until transcoding finishes
       });
     }
 
