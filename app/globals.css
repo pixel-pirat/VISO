@@ -10,6 +10,8 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Extra small breakpoint — for narrow-phone-only rules (e.g. hide a label below 480px) */
+  --breakpoint-xs: 30rem;
 }
 
 body {

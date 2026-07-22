@@ -9,6 +9,7 @@ import {
   TrendingUp, Film, Monitor, Star,
   BookMarked, Clock, Download,
   HelpCircle, Settings, ChevronLeft, ChevronRight, LogOut,
+  Menu, X, Bell,
 } from "lucide-react";
 
 type User = { name: string | null; email: string; image?: string | null };
@@ -56,6 +57,37 @@ function SectionLabel({ children, collapsed }: { children: React.ReactNode; coll
   );
 }
 
+/* ── Mobile bottom tab bar item ── */
+function TabItem({ href, icon: Icon, label, active, onClick }: {
+  href?: string; icon: React.ElementType; label: string; active?: boolean; onClick?: () => void;
+}) {
+  const content = (
+    <div className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1.5 transition-colors ${
+      active ? "text-violet-400" : "text-neutral-500"
+    }`}>
+      <Icon className={`w-5 h-5 ${active ? "fill-violet-400/20" : ""}`} />
+      <span className="text-[9px] font-semibold font-sans">{label}</span>
+    </div>
+  );
+  if (onClick) {
+    return <button onClick={onClick} className="flex-1">{content}</button>;
+  }
+  return <Link href={href!} className="flex-1">{content}</Link>;
+}
+
+/* ── "More" sheet row ── */
+function MoreRow({ href, icon: Icon, label, onClick, danger }: {
+  href?: string; icon: React.ElementType; label: string; onClick?: () => void; danger?: boolean;
+}) {
+  const cls = `flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm font-semibold font-sans transition-colors ${
+    danger ? "text-red-400 hover:bg-red-500/10" : "text-neutral-300 hover:bg-neutral-800"
+  }`;
+  if (onClick) {
+    return <button onClick={onClick} className={cls}><Icon className="w-4 h-4 shrink-0" /> {label}</button>;
+  }
+  return <Link href={href!} onClick={onClick} className={cls}><Icon className="w-4 h-4 shrink-0" /> {label}</Link>;
+}
+
 export function Sidebar({ user }: { user: User }) {
   const pathname = usePathname();
   const router   = useRouter();
@@ -63,12 +95,16 @@ export function Sidebar({ user }: { user: User }) {
   // Initialise from localStorage — default expanded
   const [collapsed, setCollapsed] = useState(false);
   const [mounted,   setMounted]   = useState(false);
+  const [moreOpen,  setMoreOpen]  = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "true") setCollapsed(true);
     setMounted(true);
   }, []);
+
+  // Close the "More" sheet whenever the route changes
+  useEffect(() => { setMoreOpen(false); }, [pathname]);
 
   const toggle = () => {
     setCollapsed((v) => {
@@ -85,91 +121,170 @@ export function Sidebar({ user }: { user: User }) {
     });
   };
 
+  // Routes covered directly by a bottom tab — everything else lives in "More"
+  const isMoreActive =
+    pathname.startsWith("/dashboard/trending") ||
+    pathname.startsWith("/dashboard/movies") ||
+    pathname.startsWith("/dashboard/tvshows") ||
+    pathname.startsWith("/dashboard/anime") ||
+    pathname.startsWith("/dashboard/watchlist") ||
+    pathname.startsWith("/dashboard/history") ||
+    pathname.startsWith("/dashboard/downloads") ||
+    pathname.startsWith("/dashboard/support") ||
+    pathname.startsWith("/dashboard/settings") ||
+    pathname.startsWith("/dashboard/notifications");
+
   // Prevent flash of wrong state before hydration
-  if (!mounted) return <aside className="w-[220px] shrink-0 h-full bg-[#0e0e10] border-r border-neutral-800/60" />;
+  if (!mounted) return <aside className="hidden md:block w-[220px] shrink-0 h-full bg-[#0e0e10] border-r border-neutral-800/60" />;
 
   const w = collapsed ? "w-[60px]" : "w-[220px]";
 
   return (
-    <aside className={`${w} shrink-0 flex flex-col h-full bg-[#0e0e10] border-r border-neutral-800/60 transition-[width] duration-200 ease-in-out overflow-hidden`}>
+    <>
+      {/* ── Desktop sidebar rail ── */}
+      <aside className={`hidden md:flex ${w} shrink-0 flex-col h-full bg-[#0e0e10] border-r border-neutral-800/60 transition-[width] duration-200 ease-in-out overflow-hidden`}>
 
-      {/* ── Logo + collapse toggle ── */}
-      <div className={`flex items-center h-14 border-b border-neutral-800/60 shrink-0 ${collapsed ? "justify-center px-0" : "justify-between px-4"}`}>
-        {!collapsed && (
-          <Link href="/dashboard" className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-linear-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-500/20 shrink-0">
+        {/* ── Logo + collapse toggle ── */}
+        <div className={`flex items-center h-14 border-b border-neutral-800/60 shrink-0 ${collapsed ? "justify-center px-0" : "justify-between px-4"}`}>
+          {!collapsed && (
+            <Link href="/dashboard" className="flex items-center gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-linear-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-500/20 shrink-0">
+                <Play className="w-3.5 h-3.5 text-white fill-white" />
+              </div>
+              <span className="text-sm font-extrabold tracking-widest text-white uppercase font-sans">VISO</span>
+            </Link>
+          )}
+          {collapsed && (
+            <div className="w-7 h-7 rounded-lg bg-linear-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
               <Play className="w-3.5 h-3.5 text-white fill-white" />
             </div>
-            <span className="text-sm font-extrabold tracking-widest text-white uppercase font-sans">VISO</span>
-          </Link>
-        )}
-        {collapsed && (
-          <div className="w-7 h-7 rounded-lg bg-linear-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
-            <Play className="w-3.5 h-3.5 text-white fill-white" />
-          </div>
-        )}
-        <button
-          onClick={toggle}
-          className={`w-6 h-6 rounded-md bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors ${collapsed ? "absolute left-[46px] top-4 z-10 shadow-lg border border-neutral-700" : ""}`}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed
-            ? <ChevronRight className="w-3.5 h-3.5 text-neutral-400" />
-            : <ChevronLeft  className="w-3.5 h-3.5 text-neutral-400" />}
-        </button>
-      </div>
-
-      {/* ── Nav ── */}
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-1 py-2 space-y-0.5 scrollbar-hide">
-        <SectionLabel collapsed={collapsed}>General</SectionLabel>
-        <NavItem href="/dashboard"         icon={Home}          label="Home"     active={pathname === "/dashboard"}                   collapsed={collapsed} />
-        <NavItem href="/dashboard/rooms"   icon={Tv2}           label="Rooms"    active={pathname.startsWith("/dashboard/rooms")}     collapsed={collapsed} />
-        <NavItem href="/dashboard/chat"    icon={MessageSquare} label="Chat"     active={pathname.startsWith("/dashboard/chat")}      collapsed={collapsed} />
-        <NavItem href="/dashboard/friends" icon={Users}         label="Friends"  active={pathname.startsWith("/dashboard/friends")}   collapsed={collapsed} />
-
-        <SectionLabel collapsed={collapsed}>Discover</SectionLabel>
-        <NavItem href="/dashboard/trending" icon={TrendingUp} label="Trending" active={pathname.startsWith("/dashboard/trending")} collapsed={collapsed} />
-        <NavItem href="/dashboard/movies"   icon={Film}       label="Movies"   active={pathname.startsWith("/dashboard/movies")}   collapsed={collapsed} />
-        <NavItem href="/dashboard/tvshows"  icon={Monitor}    label="TV Shows" active={pathname.startsWith("/dashboard/tvshows")}  collapsed={collapsed} />
-        <NavItem href="/dashboard/anime"    icon={Star}       label="Anime"    active={pathname.startsWith("/dashboard/anime")}    collapsed={collapsed} />
-
-        <SectionLabel collapsed={collapsed}>Library</SectionLabel>
-        <NavItem href="/dashboard/watchlist"  icon={BookMarked} label="Watchlist"  active={pathname.startsWith("/dashboard/watchlist")}  collapsed={collapsed} />
-        <NavItem href="/dashboard/history"    icon={Clock}      label="History"    active={pathname.startsWith("/dashboard/history")}    collapsed={collapsed} />
-        <NavItem href="/dashboard/downloads"  icon={Download}   label="Downloads"  active={pathname.startsWith("/dashboard/downloads")}  collapsed={collapsed} />
-      </nav>
-
-      {/* ── Bottom nav ── */}
-      <div className="border-t border-neutral-800/60 px-1 py-2 space-y-0.5 shrink-0">
-        <NavItem href="/dashboard/support"  icon={HelpCircle} label="Support"  active={pathname.startsWith("/dashboard/support")}  collapsed={collapsed} />
-        <NavItem href="/dashboard/settings" icon={Settings}   label="Settings" active={pathname.startsWith("/dashboard/settings")} collapsed={collapsed} />
-      </div>
-
-      {/* ── User row ── */}
-      <button
-        onClick={handleSignOut}
-        title={collapsed ? `Sign out (${user.name})` : "Click to sign out"}
-        className={`flex items-center border-t border-neutral-800/60 hover:bg-neutral-800/40 transition-colors w-full group
-          ${collapsed ? "justify-center py-3 px-0" : "gap-3 px-4 py-3 text-left"}`}
-      >
-        <div className="w-8 h-8 rounded-full bg-linear-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-bold font-sans shrink-0 overflow-hidden">
-          {user.image
-            ? <img src={user.image} alt="" className="w-full h-full object-cover" /> // eslint-disable-line @next/next/no-img-element
-            : initials}
+          )}
+          <button
+            onClick={toggle}
+            className={`w-6 h-6 rounded-md bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors ${collapsed ? "absolute left-[46px] top-4 z-10 shadow-lg border border-neutral-700" : ""}`}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed
+              ? <ChevronRight className="w-3.5 h-3.5 text-neutral-400" />
+              : <ChevronLeft  className="w-3.5 h-3.5 text-neutral-400" />}
+          </button>
         </div>
 
-        {!collapsed && (
-          <>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-white truncate font-sans">{user.name}</p>
-              <p className="text-[10px] text-neutral-500 truncate font-sans">
-                @{(user as { username?: string }).username ?? user.email}
-              </p>
+        {/* ── Nav ── */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-1 py-2 space-y-0.5 scrollbar-hide">
+          <SectionLabel collapsed={collapsed}>General</SectionLabel>
+          <NavItem href="/dashboard"         icon={Home}          label="Home"     active={pathname === "/dashboard"}                   collapsed={collapsed} />
+          <NavItem href="/dashboard/rooms"   icon={Tv2}           label="Rooms"    active={pathname.startsWith("/dashboard/rooms")}     collapsed={collapsed} />
+          <NavItem href="/dashboard/chat"    icon={MessageSquare} label="Chat"     active={pathname.startsWith("/dashboard/chat")}      collapsed={collapsed} />
+          <NavItem href="/dashboard/friends" icon={Users}         label="Friends"  active={pathname.startsWith("/dashboard/friends")}   collapsed={collapsed} />
+
+          <SectionLabel collapsed={collapsed}>Discover</SectionLabel>
+          <NavItem href="/dashboard/trending" icon={TrendingUp} label="Trending" active={pathname.startsWith("/dashboard/trending")} collapsed={collapsed} />
+          <NavItem href="/dashboard/movies"   icon={Film}       label="Movies"   active={pathname.startsWith("/dashboard/movies")}   collapsed={collapsed} />
+          <NavItem href="/dashboard/tvshows"  icon={Monitor}    label="TV Shows" active={pathname.startsWith("/dashboard/tvshows")}  collapsed={collapsed} />
+          <NavItem href="/dashboard/anime"    icon={Star}       label="Anime"    active={pathname.startsWith("/dashboard/anime")}    collapsed={collapsed} />
+
+          <SectionLabel collapsed={collapsed}>Library</SectionLabel>
+          <NavItem href="/dashboard/watchlist"  icon={BookMarked} label="Watchlist"  active={pathname.startsWith("/dashboard/watchlist")}  collapsed={collapsed} />
+          <NavItem href="/dashboard/history"    icon={Clock}      label="History"    active={pathname.startsWith("/dashboard/history")}    collapsed={collapsed} />
+          <NavItem href="/dashboard/downloads"  icon={Download}   label="Downloads"  active={pathname.startsWith("/dashboard/downloads")}  collapsed={collapsed} />
+        </nav>
+
+        {/* ── Bottom nav ── */}
+        <div className="border-t border-neutral-800/60 px-1 py-2 space-y-0.5 shrink-0">
+          <NavItem href="/dashboard/support"  icon={HelpCircle} label="Support"  active={pathname.startsWith("/dashboard/support")}  collapsed={collapsed} />
+          <NavItem href="/dashboard/settings" icon={Settings}   label="Settings" active={pathname.startsWith("/dashboard/settings")} collapsed={collapsed} />
+        </div>
+
+        {/* ── User row ── */}
+        <button
+          onClick={handleSignOut}
+          title={collapsed ? `Sign out (${user.name})` : "Click to sign out"}
+          className={`flex items-center border-t border-neutral-800/60 hover:bg-neutral-800/40 transition-colors w-full group
+            ${collapsed ? "justify-center py-3 px-0" : "gap-3 px-4 py-3 text-left"}`}
+        >
+          <div className="w-8 h-8 rounded-full bg-linear-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-xs font-bold font-sans shrink-0 overflow-hidden">
+            {user.image
+              ? <img src={user.image} alt="" className="w-full h-full object-cover" /> // eslint-disable-line @next/next/no-img-element
+              : initials}
+          </div>
+
+          {!collapsed && (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-white truncate font-sans">{user.name}</p>
+                <p className="text-[10px] text-neutral-500 truncate font-sans">
+                  @{(user as { username?: string }).username ?? user.email}
+                </p>
+              </div>
+              <LogOut className="w-3.5 h-3.5 text-neutral-600 group-hover:text-neutral-400 transition-colors shrink-0" />
+            </>
+          )}
+        </button>
+      </aside>
+
+      {/* ── Mobile bottom tab bar ── */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 flex items-stretch bg-[#0e0e10]/95 backdrop-blur-xl border-t border-neutral-800/60"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <TabItem href="/dashboard"         icon={Home}          label="Home"    active={pathname === "/dashboard"} />
+        <TabItem href="/dashboard/rooms"   icon={Tv2}           label="Rooms"   active={pathname.startsWith("/dashboard/rooms")} />
+        <TabItem href="/dashboard/chat"    icon={MessageSquare} label="Chat"    active={pathname.startsWith("/dashboard/chat")} />
+        <TabItem href="/dashboard/friends" icon={Users}         label="Friends" active={pathname.startsWith("/dashboard/friends")} />
+        <TabItem icon={moreOpen ? X : Menu} label="More" active={isMoreActive || moreOpen} onClick={() => setMoreOpen((v) => !v)} />
+      </nav>
+
+      {/* ── "More" bottom sheet ── */}
+      {moreOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMoreOpen(false)} />
+          <div
+            className="relative bg-[#0e0e10] border-t border-neutral-800/60 rounded-t-2xl max-h-[75vh] overflow-y-auto scrollbar-hide"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
+          >
+            <div className="w-10 h-1 rounded-full bg-neutral-700 mx-auto mt-3 mb-1" />
+
+            {/* user row */}
+            <div className="flex items-center gap-3 px-4 py-4 border-b border-neutral-800/60">
+              <div className="w-10 h-10 rounded-full bg-linear-to-br from-violet-500 to-fuchsia-500 flex items-center justify-center text-white text-sm font-bold font-sans shrink-0 overflow-hidden">
+                {user.image
+                  ? <img src={user.image} alt="" className="w-full h-full object-cover" /> // eslint-disable-line @next/next/no-img-element
+                  : initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white truncate font-sans">{user.name}</p>
+                <p className="text-xs text-neutral-500 truncate font-sans">
+                  @{(user as { username?: string }).username ?? user.email}
+                </p>
+              </div>
+              <Link href="/profile" onClick={() => setMoreOpen(false)}
+                className="text-xs text-violet-400 hover:text-violet-300 font-semibold font-sans shrink-0">
+                View
+              </Link>
             </div>
-            <LogOut className="w-3.5 h-3.5 text-neutral-600 group-hover:text-neutral-400 transition-colors shrink-0" />
-          </>
-        )}
-      </button>
-    </aside>
+
+            <div className="px-2 py-2">
+              <p className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-neutral-600 font-sans">Discover</p>
+              <MoreRow href="/dashboard/trending" icon={TrendingUp} label="Trending" />
+              <MoreRow href="/dashboard/movies"   icon={Film}       label="Movies" />
+              <MoreRow href="/dashboard/tvshows"  icon={Monitor}    label="TV Shows" />
+              <MoreRow href="/dashboard/anime"    icon={Star}       label="Anime" />
+
+              <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-neutral-600 font-sans">Library</p>
+              <MoreRow href="/dashboard/watchlist" icon={BookMarked} label="Watchlist" />
+              <MoreRow href="/dashboard/history"   icon={Clock}      label="History" />
+              <MoreRow href="/dashboard/downloads" icon={Download}   label="Downloads" />
+
+              <p className="px-3 pt-3 pb-1 text-[10px] font-bold uppercase tracking-widest text-neutral-600 font-sans">Account</p>
+              <MoreRow href="/dashboard/notifications" icon={Bell}       label="Notifications" />
+              <MoreRow href="/dashboard/settings"       icon={Settings}   label="Settings" />
+              <MoreRow href="/dashboard/support"        icon={HelpCircle} label="Support" />
+              <MoreRow onClick={handleSignOut} icon={LogOut} label="Sign Out" danger />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

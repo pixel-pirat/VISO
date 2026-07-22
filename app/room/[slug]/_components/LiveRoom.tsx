@@ -11,6 +11,7 @@ import {
   LocalTrackPublication,
   RemoteTrackPublication,
 } from "livekit-client";
+import { X } from "lucide-react";
 import { RoomSidebar }   from "./RoomSidebar";
 import { VideoGrid }     from "./VideoGrid";
 import { VideoPlayer }   from "./VideoPlayer";
@@ -137,6 +138,9 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
   });
   const [showReactionBar, setShowReactionBar] = useState(true);
   const reactionIdRef = useRef(0);
+
+  /* ── Mobile-only overlay panels — participants / chat sheets ── */
+  const [mobilePanel, setMobilePanel] = useState<"none" | "people" | "chat">("none");
 
   /* ── Polls & Q&A ── */
   const [poll,      setPoll]      = useState<PollState | null>(null);
@@ -510,19 +514,33 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
     }).catch(console.error);
   }, [isHost, roomInfo.slug]);
 
+  const chatPanelProps = {
+    messages, input: chatInput, setInput: setChatInput, onSend: sendChat,
+    participantCount: participants.length, activeTab, setActiveTab, roomInfo,
+    currentUserId: currentUser.id, isHost, onReaction: sendReaction,
+    onInvite: copyInvite, invited,
+    poll, onCreatePoll: createPoll, onVotePoll: votePoll, onEndPoll: endPoll,
+    questions, onAskQuestion: askQuestion, onMarkAnswered: markAnswered,
+  };
+
+  // Show the mobile filmstrip only when there's someone besides you on cam/in-room
+  const showParticipantStrip = !theatreMode && participants.length > 1;
+
   return (
     <div className={`flex h-screen bg-[#0d0d0f] text-neutral-200 overflow-hidden ${theatreMode ? "theatre-mode" : ""}`}>
 
-      {/* ── Left sidebar ── */}
-      <RoomSidebar
-        roomInfo={roomInfo}
-        participants={participants}
-        isHost={isHost}
-        currentUserId={currentUser.id}
-        lkConnected={lkConnected}
-        onInvite={copyInvite}
-        invited={invited}
-      />
+      {/* ── Left sidebar — desktop rail only ── */}
+      <div className="hidden md:flex md:shrink-0 h-full">
+        <RoomSidebar
+          roomInfo={roomInfo}
+          participants={participants}
+          isHost={isHost}
+          currentUserId={currentUser.id}
+          lkConnected={lkConnected}
+          onInvite={copyInvite}
+          invited={invited}
+        />
+      </div>
 
       {/* ── Centre: video player + participant grid + controls ── */}
       <div className="flex flex-col flex-1 min-w-0 min-h-0">
@@ -535,12 +553,14 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
           onLeave={onLeave}
           onInvite={copyInvite}
           invited={invited}
+          onOpenPeople={() => setMobilePanel("people")}
+          onOpenChat={() => setMobilePanel("chat")}
         />
 
         {/* main content area */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* video player */}
-          <div className={`relative flex-shrink-0 ${theatreMode ? "flex-1" : ""}`} style={{ height: theatreMode ? undefined : "38%" }}>
+          {/* video player — fills all available space on mobile; fixed 38% band on desktop */}
+          <div className={`relative shrink-0 ${theatreMode ? "flex-1" : "flex-1 md:flex-none md:h-[38%]"}`}>
             <VideoPlayer
               playbackState={playbackState}
               queue={queue}
@@ -575,11 +595,18 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
             )}
           </div>
 
-          {/* participant video grid */}
+          {/* participant video grid — full grid on desktop, compact filmstrip on mobile */}
           {!theatreMode && (
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <VideoGrid participants={participants} isHost={isHost} />
-            </div>
+            <>
+              <div className="hidden md:block md:flex-1 md:min-h-0 md:overflow-hidden">
+                <VideoGrid participants={participants} isHost={isHost} mode="grid" />
+              </div>
+              {showParticipantStrip && (
+                <div className="md:hidden shrink-0">
+                  <VideoGrid participants={participants} isHost={isHost} mode="strip" />
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -602,29 +629,46 @@ export function LiveRoom({ joinData, currentUser, onLeave }: LiveRoomProps) {
         />
       </div>
 
-      {/* ── Right: chat panel ── */}
-      <ChatPanel
-        messages={messages}
-        input={chatInput}
-        setInput={setChatInput}
-        onSend={sendChat}
-        participantCount={participants.length}
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        roomInfo={roomInfo}
-        currentUserId={currentUser.id}
-        isHost={isHost}
-        onReaction={sendReaction}
-        onInvite={copyInvite}
-        invited={invited}
-        poll={poll}
-        onCreatePoll={createPoll}
-        onVotePoll={votePoll}
-        onEndPoll={endPoll}
-        questions={questions}
-        onAskQuestion={askQuestion}
-        onMarkAnswered={markAnswered}
-      />
+      {/* ── Right: chat panel — desktop rail only ── */}
+      <div className="hidden md:flex md:shrink-0 h-full">
+        <ChatPanel {...chatPanelProps} />
+      </div>
+
+      {/* ── Mobile: participants sheet ── */}
+      {mobilePanel === "people" && (
+        <div className="md:hidden fixed inset-0 z-50 flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobilePanel("none")} />
+          <div className="relative bg-[#0a0a0c] border-t border-neutral-800/60 rounded-t-2xl max-h-[80vh] flex flex-col overflow-hidden">
+            <div className="w-10 h-1 rounded-full bg-neutral-700 mx-auto mt-3 shrink-0" />
+            <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800/60 shrink-0">
+              <p className="text-sm font-bold text-white font-sans">Participants ({participants.length})</p>
+              <button onClick={() => setMobilePanel("none")}
+                className="w-7 h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors">
+                <X className="w-3.5 h-3.5 text-neutral-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-hide">
+              <RoomSidebar
+                variant="sheet"
+                roomInfo={roomInfo}
+                participants={participants}
+                isHost={isHost}
+                currentUserId={currentUser.id}
+                lkConnected={lkConnected}
+                onInvite={copyInvite}
+                invited={invited}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Mobile: chat/polls/qa full-screen sheet ── */}
+      {mobilePanel === "chat" && (
+        <div className="md:hidden fixed inset-0 z-50 flex flex-col">
+          <ChatPanel {...chatPanelProps} mobile onClose={() => setMobilePanel("none")} />
+        </div>
+      )}
 
       <style jsx global>{`
         @keyframes floatUp {

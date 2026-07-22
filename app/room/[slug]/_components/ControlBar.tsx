@@ -31,14 +31,14 @@ function CtrlBtn({
 }) {
   return (
     <button onClick={onClick} disabled={disabled} title={title}
-      className={`flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all group ${
+      className={`shrink-0 flex flex-col items-center gap-1 px-2.5 sm:px-4 py-2 rounded-xl transition-all group ${
         danger    ? "text-red-400 hover:bg-red-500/20"
         : active  ? "text-white bg-neutral-700"
         : disabled? "text-neutral-700 cursor-not-allowed"
         :           "text-neutral-400 hover:text-white hover:bg-neutral-800"
       }`}>
       <Icon className="w-5 h-5" />
-      <span className="text-[9px] font-semibold font-sans">{label}</span>
+      <span className="hidden sm:block text-[9px] font-semibold font-sans">{label}</span>
     </button>
   );
 }
@@ -49,7 +49,10 @@ export function ControlBar({
   onToggleMic, onToggleCamera, onToggleScreenShare, onRaiseHand, onOpenReactions, onLeave,
 }: ControlBarProps) {
   return (
-    <footer className="h-16 shrink-0 flex items-center justify-center gap-1 px-6 border-t border-neutral-800/60 bg-[#0d0d0f]">
+    <footer
+      className="min-h-16 shrink-0 flex items-center justify-center gap-0.5 sm:gap-1 px-2 sm:px-6 py-2 border-t border-neutral-800/60 bg-[#0d0d0f] overflow-x-auto scrollbar-hide"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.5rem)" }}
+    >
       <CtrlBtn
         icon={isMuted ? MicOff : Mic}
         label={isMuted ? "Unmute" : "Mute"}

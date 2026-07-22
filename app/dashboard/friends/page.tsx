@@ -120,17 +120,17 @@ export default function FriendsPage() {
         <Topbar user={session.user} unreadCount={0} />
 
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="max-w-3xl mx-auto px-6 py-6">
+          <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6">
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
+            <div className="flex items-center justify-between gap-3 mb-6">
+              <div className="min-w-0">
                 <h1 className="text-lg font-extrabold text-white font-sans">Friends</h1>
                 <p className="text-xs text-neutral-500 font-sans mt-0.5">{friends.length} friend{friends.length !== 1 ? "s" : ""}</p>
               </div>
               <button onClick={() => setTab("search")}
-                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-bold text-white transition-colors font-sans">
-                <UserPlus className="w-4 h-4" /> Add Friend
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-bold text-white transition-colors font-sans shrink-0">
+                <UserPlus className="w-4 h-4" /> <span className="hidden xs:inline">Add Friend</span>
               </button>
             </div>
 
@@ -173,7 +173,7 @@ export default function FriendsPage() {
                           <p className="text-sm font-semibold text-white font-sans truncate">{friend.name}</p>
                           <p className="text-xs text-neutral-500 font-sans">@{friend.username ?? "—"} · <span className="capitalize">{friend.status.toLowerCase().replace("_"," ")}</span></p>
                         </div>
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           <button onClick={() => openDM(friend.id)}
                             className="w-8 h-8 rounded-lg bg-neutral-800 hover:bg-violet-600 flex items-center justify-center transition-colors" title="Message">
                             <MessageSquare className="w-3.5 h-3.5 text-neutral-400 group-hover:text-white" />

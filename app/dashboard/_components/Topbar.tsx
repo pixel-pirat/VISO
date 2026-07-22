@@ -34,13 +34,13 @@ export function Topbar({ user, unreadCount, onCreateRoom, searchValue, onSearchC
   };
 
   return (
-    <header className="h-14 shrink-0 flex items-center justify-between gap-4 px-6 border-b border-neutral-800/60 bg-[#111113]">
+    <header className="h-14 shrink-0 flex items-center justify-between gap-2 sm:gap-4 px-3 sm:px-6 border-b border-neutral-800/60 bg-[#111113]">
       <div className="min-w-0">
-        <h1 className="text-sm font-extrabold text-white font-sans truncate">Welcome back, {firstName}</h1>
-        <p className="text-[11px] text-neutral-500 font-sans">{today}</p>
+        <h1 className="text-xs sm:text-sm font-extrabold text-white font-sans truncate">Welcome back, {firstName}</h1>
+        <p className="text-[10px] sm:text-[11px] text-neutral-500 font-sans hidden xs:block">{today}</p>
       </div>
 
-      <div className="flex-1 max-w-xs relative hidden md:block">
+      <div className="flex-1 max-w-xs relative hidden sm:block">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-600" />
         <input
           type="text"
@@ -52,11 +52,19 @@ export function Topbar({ user, unreadCount, onCreateRoom, searchValue, onSearchC
         />
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        {/* Mobile search — icon only, jumps to rooms search */}
+        <button
+          onClick={() => router.push("/dashboard/rooms")}
+          title="Search"
+          className="sm:hidden w-8 h-8 rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center transition-colors shrink-0"
+        >
+          <Search className="w-4 h-4 text-neutral-400" />
+        </button>
         <Link
           href="/dashboard/notifications"
           title="Notifications"
-          className="w-8 h-8 rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center transition-colors relative"
+          className="w-8 h-8 rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center transition-colors relative shrink-0"
         >
           <Bell className="w-4 h-4 text-neutral-400" />
           {unreadCount > 0 && (
@@ -67,9 +75,10 @@ export function Topbar({ user, unreadCount, onCreateRoom, searchValue, onSearchC
         </Link>
         <button
           onClick={onCreateRoom ?? (() => router.push("/dashboard/rooms?create=1"))}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-violet-500/20 font-sans"
+          title="Create Room"
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-violet-500/20 font-sans shrink-0"
         >
-          <Plus className="w-3.5 h-3.5" /> Create Room
+          <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Create Room</span>
         </button>
       </div>
     </header>

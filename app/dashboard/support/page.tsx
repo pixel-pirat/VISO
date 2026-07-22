@@ -70,7 +70,7 @@ export default function SupportPage() {
         <Topbar user={session.user} unreadCount={0} />
 
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="max-w-2xl mx-auto px-6 py-6">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6">
 
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
@@ -105,13 +105,13 @@ export default function SupportPage() {
             </div>
 
             {/* Contact */}
-            <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 flex items-center justify-between gap-4">
+            <div className="rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
               <div>
                 <p className="text-xs font-bold text-white font-sans">Still stuck?</p>
                 <p className="text-[11px] text-neutral-500 font-sans mt-0.5">Email us and we'll get back to you.</p>
               </div>
               <a href={`mailto:${SUPPORT_EMAIL}?subject=VISO%20Support`}
-                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-xs font-bold text-white transition-colors font-sans shrink-0">
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-xl text-xs font-bold text-white transition-colors font-sans shrink-0">
                 <Mail className="w-3.5 h-3.5" /> Contact Support
               </a>
             </div>

@@ -67,7 +67,7 @@ export default function DownloadsPage() {
       <div className="flex flex-col flex-1 min-w-0">
         <Topbar user={session.user} unreadCount={0} />
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide px-6 py-6">
+        <div className="flex-1 overflow-y-auto scrollbar-hide px-4 sm:px-6 py-6 pb-24 md:pb-6">
           <div className="mb-6">
             <h1 className="text-lg font-extrabold text-white font-sans">Saved Content</h1>
             <p className="text-xs text-neutral-500 font-sans mt-0.5">
@@ -156,7 +156,7 @@ export default function DownloadsPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="flex items-center gap-2 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center gap-2 shrink-0 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                           {room && (
                             <Link
                               href={isLive ? `/room/${room.slug}` : `/dashboard/rooms/${room.slug}`}

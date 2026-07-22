@@ -151,17 +151,17 @@ export default function SettingsPage() {
         <Topbar user={session.user} unreadCount={0} />
 
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="max-w-2xl mx-auto px-6 py-8 space-y-5">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 pb-24 md:pb-8 space-y-5">
 
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <h1 className="text-lg font-extrabold text-white font-sans">Settings</h1>
                 <p className="text-xs text-neutral-500 font-sans mt-0.5">Manage your account and preferences</p>
               </div>
               <button onClick={handleSave} disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-xl text-sm font-bold text-white transition-colors font-sans shadow-lg shadow-violet-500/20">
+                className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 rounded-xl text-sm font-bold text-white transition-colors font-sans shadow-lg shadow-violet-500/20 shrink-0">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : saved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
-                {saved ? "Saved!" : saving ? "Saving…" : "Save Changes"}
+                <span className="hidden xs:inline">{saved ? "Saved!" : saving ? "Saving…" : "Save Changes"}</span>
               </button>
             </div>
 
@@ -199,7 +199,7 @@ export default function SettingsPage() {
             {/* ── Profile Info ── */}
             <SettingSection title="Profile Information" desc="This is how others see you on VISO">
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Field label="Full Name">
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-600" />

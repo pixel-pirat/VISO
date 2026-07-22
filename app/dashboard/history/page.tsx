@@ -69,7 +69,7 @@ export default function HistoryPage() {
       <div className="flex flex-col flex-1 min-w-0">
         <Topbar user={session.user} unreadCount={0} />
 
-        <div className="flex-1 overflow-y-auto scrollbar-hide px-6 py-6">
+        <div className="flex-1 overflow-y-auto scrollbar-hide px-4 sm:px-6 py-6 pb-24 md:pb-6">
           <div className="mb-6">
             <h1 className="text-lg font-extrabold text-white font-sans">Watch History</h1>
             <p className="text-xs text-neutral-500 font-sans mt-0.5">Rooms you&apos;ve been in</p>
@@ -133,7 +133,7 @@ export default function HistoryPage() {
 
                         {/* Rejoin button */}
                         <Link href={isLive ? `/room/${entry.room.slug}` : `/dashboard/rooms/${entry.room.slug}`}
-                          className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors font-sans opacity-0 group-hover:opacity-100 ${
+                          className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-colors font-sans opacity-100 sm:opacity-0 sm:group-hover:opacity-100 ${
                             isLive
                               ? "bg-violet-600 hover:bg-violet-500 text-white"
                               : "bg-neutral-800 hover:bg-neutral-700 text-neutral-300"

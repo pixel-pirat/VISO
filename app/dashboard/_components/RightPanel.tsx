@@ -89,7 +89,7 @@ export function RightPanel({
   const allFriends = friends; // show all when no one is online
 
   return (
-    <aside className="w-[240px] shrink-0 h-full overflow-y-auto bg-[#0e0e10] border-l border-neutral-800/60 scrollbar-hide">
+    <aside className="hidden xl:block w-[240px] shrink-0 h-full overflow-y-auto bg-[#0e0e10] border-l border-neutral-800/60 scrollbar-hide">
 
       {/* Notifications */}
       <PanelSection

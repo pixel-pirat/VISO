@@ -78,10 +78,27 @@ function ParticipantTile({ participant, isHost }: { participant: RoomParticipant
 interface VideoGridProps {
   participants: RoomParticipant[];
   isHost:       boolean;
+  /** "grid" (default) fills the available area; "strip" is a fixed-size
+   *  horizontal-scroll filmstrip — used on mobile so the main video keeps
+   *  most of the screen instead of splitting it with a full grid. */
+  mode?: "grid" | "strip";
 }
 
-export function VideoGrid({ participants, isHost }: VideoGridProps) {
+export function VideoGrid({ participants, isHost, mode = "grid" }: VideoGridProps) {
   const count = participants.length;
+
+  if (mode === "strip") {
+    if (count === 0) return null;
+    return (
+      <div className="w-full overflow-x-auto scrollbar-hide flex gap-2 px-2 py-2 bg-black/40">
+        {participants.map((p) => (
+          <div key={p.identity} className="w-24 h-32 shrink-0">
+            <ParticipantTile participant={p} isHost={isHost} />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   // Decide grid columns based on count
   const cols = count <= 2 ? 2 : count <= 4 ? 4 : count <= 6 ? 3 : 4;

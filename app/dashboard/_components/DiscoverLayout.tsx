@@ -35,8 +35,8 @@ function MediaCard({ item, onPlay, onWatchlist, inWatchlist }: {
           : <div className="w-full h-full flex items-center justify-center"><Play className="w-8 h-8 text-neutral-700" /></div>}
       </div>
 
-      {/* overlay on hover */}
-      <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
+      {/* overlay — always visible on touch devices, hover-reveal on desktop */}
+      <div className="absolute inset-0 bg-linear-to-t from-black/90 via-black/20 to-transparent opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
         <button
           className="w-full flex items-center justify-center gap-2 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg text-xs font-bold text-white transition-colors font-sans mb-1.5"
           onClick={(e) => { e.stopPropagation(); onPlay(item); }}
@@ -88,20 +88,20 @@ function HeroSlider({ items, onPlay }: { items: MediaItem[]; onPlay: (item: Medi
   const backdrop = IMG.backdrop(item.backdrop_path, "w1280");
 
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden mb-6" style={{ height: 340 }}>
+    <div className="relative w-full rounded-2xl overflow-hidden mb-6 h-[260px] sm:h-[340px]">
       {backdrop
         ? <img src={backdrop} alt={title(item)} className="absolute inset-0 w-full h-full object-cover" /> // eslint-disable-line @next/next/no-img-element
         : <div className="absolute inset-0 bg-linear-to-br from-violet-900 to-indigo-950" />}
       <div className="absolute inset-0 bg-linear-to-r from-black/90 via-black/50 to-transparent" />
 
       {/* content */}
-      <div className="absolute inset-0 flex flex-col justify-end p-8">
+      <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-8">
         <p className="text-xs font-bold uppercase tracking-widest text-violet-400 font-sans mb-1">{year(item)}</p>
-        <h2 className="text-3xl font-extrabold text-white font-sans leading-tight mb-2 max-w-xl">{title(item)}</h2>
-        <p className="text-sm text-neutral-300 font-sans max-w-lg line-clamp-2 mb-4">{item.overview}</p>
+        <h2 className="text-xl sm:text-3xl font-extrabold text-white font-sans leading-tight mb-2 max-w-xl">{title(item)}</h2>
+        <p className="hidden sm:block text-sm text-neutral-300 font-sans max-w-lg line-clamp-2 mb-4">{item.overview}</p>
         <div className="flex items-center gap-3">
           <button onClick={() => onPlay(item)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-bold text-white transition-colors font-sans shadow-lg shadow-violet-500/20">
+            className="flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-bold text-white transition-colors font-sans shadow-lg shadow-violet-500/20">
             <Play className="w-4 h-4 fill-white" /> Watch Trailer
           </button>
           <div className="flex items-center gap-1 text-sm text-yellow-400 font-semibold font-sans">
@@ -325,11 +325,11 @@ export function DiscoverLayout({ pageTitle, heroPath, heroParams, sections, sear
       <div className="flex flex-col flex-1 min-w-0">
         <Topbar user={session.user} unreadCount={0} />
 
-        <main className="flex-1 overflow-y-auto scrollbar-hide px-6 py-5">
+        <main className="flex-1 overflow-y-auto scrollbar-hide px-4 sm:px-6 py-5 pb-24 md:pb-5">
           {/* Page title + search */}
-          <div className="flex items-center justify-between gap-4 mb-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <h1 className="text-lg font-extrabold text-white font-sans">{pageTitle}</h1>
-            <div className="relative w-64">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-600" />
               <input
                 value={query}
@@ -347,7 +347,7 @@ export function DiscoverLayout({ pageTitle, heroPath, heroParams, sections, sear
               <h2 className="text-sm font-bold text-white font-sans mb-3">
                 {searchRes.length > 0 ? `Results for "${query}"` : searching ? "Searching…" : `No results for "${query}"`}
               </h2>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+              <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3">
                 {searchRes.map(item => <MediaCard key={item.id} item={item} onPlay={setActiveItem} />)}
               </div>
             </section>

@@ -99,10 +99,10 @@ export default function NotificationsPage() {
         <Topbar user={session.user} unreadCount={unread} />
 
         <div className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="max-w-2xl mx-auto px-6 py-6">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 pb-24 md:pb-6">
 
-            <div className="flex items-center justify-between mb-6">
-              <div>
+            <div className="flex items-center justify-between gap-3 mb-6">
+              <div className="min-w-0">
                 <h1 className="text-lg font-extrabold text-white font-sans">Notifications</h1>
                 <p className="text-xs text-neutral-500 font-sans mt-0.5">
                   {unread > 0 ? `${unread} unread` : "You're all caught up"}
@@ -110,8 +110,8 @@ export default function NotificationsPage() {
               </div>
               {unread > 0 && (
                 <button onClick={markAllRead}
-                  className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-bold text-neutral-300 hover:text-white transition-colors font-sans">
-                  <CheckCheck className="w-3.5 h-3.5" /> Mark all as read
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-bold text-neutral-300 hover:text-white transition-colors font-sans shrink-0">
+                  <CheckCheck className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Mark all as read</span>
                 </button>
               )}
             </div>

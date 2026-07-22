@@ -78,7 +78,7 @@ export function RoomDetail({
   const friendsInRoom = room.members.filter((m) => m.userId !== room.hostId);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-6 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
       {/* ── breadcrumb ── */}
       <Link href="/dashboard/rooms"
@@ -87,7 +87,7 @@ export function RoomDetail({
       </Link>
 
       {/* ── hero banner ── */}
-      <div className={`relative w-full rounded-2xl overflow-hidden bg-linear-to-br ${g}`} style={{ minHeight: 260 }}>
+      <div className={`relative w-full rounded-2xl overflow-hidden bg-linear-to-br ${g} min-h-[220px] sm:min-h-[260px]`}>
         {cover && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={cover} alt={room.name} className="absolute inset-0 w-full h-full object-cover opacity-40" />
@@ -124,11 +124,11 @@ export function RoomDetail({
         )}
 
         {/* content */}
-        <div className="relative z-10 p-8 pt-16">
+        <div className="relative z-10 p-4 sm:p-8 pt-16">
           {room.contentTitle && (
             <p className="text-xs text-violet-300 font-semibold font-sans mb-1 uppercase tracking-wider">{room.contentTitle}</p>
           )}
-          <h1 className="text-3xl font-extrabold text-white font-sans leading-tight mb-2">{room.name}</h1>
+          <h1 className="text-xl sm:text-3xl font-extrabold text-white font-sans leading-tight mb-2">{room.name}</h1>
 
           <div className="flex items-center gap-2 flex-wrap mb-4">
             <div className={`w-7 h-7 rounded-full bg-linear-to-br ${avatarG(room.host.id)} flex items-center justify-center text-white text-[10px] font-bold shrink-0`}>
@@ -179,7 +179,7 @@ export function RoomDetail({
         <div className="lg:col-span-3 space-y-5">
 
           {/* room info card */}
-          <div className="bg-neutral-900/60 border border-neutral-800/60 rounded-2xl p-5 grid grid-cols-2 gap-5">
+          <div className="bg-neutral-900/60 border border-neutral-800/60 rounded-2xl p-5 grid grid-cols-1 xs:grid-cols-2 gap-5">
             <InfoRow label="Room Type"
               value={
                 <span className="flex items-center gap-1.5">
@@ -207,7 +207,7 @@ export function RoomDetail({
               }
             />
             {/* comm detail row */}
-            <div className="col-span-2 pt-3 border-t border-neutral-800/60">
+            <div className="col-span-1 xs:col-span-2 pt-3 border-t border-neutral-800/60">
               <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-600 font-sans mb-2">Communication Options</p>
               <div className="flex gap-2 flex-wrap">
                 {[

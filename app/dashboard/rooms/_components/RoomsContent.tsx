@@ -121,8 +121,8 @@ function FeaturedHero({ rooms }: { rooms: Room[] }) {
         </span>
       </div>
 
-      <div className="relative z-10 p-6 pt-14">
-        <h3 className="text-2xl font-extrabold text-white font-sans leading-tight">{title}</h3>
+      <div className="relative z-10 p-4 sm:p-6 pt-14">
+        <h3 className="text-lg sm:text-2xl font-extrabold text-white font-sans leading-tight">{title}</h3>
         {room.name !== title && <p className="text-sm text-neutral-400 font-sans mt-0.5">{room.name}</p>}
         <p className="text-xs text-neutral-400 font-sans mt-1">
           Hosted by <span className="text-violet-400 font-semibold">{room.host.username ?? room.host.name}</span>
@@ -373,7 +373,7 @@ export function RoomsContent({
   const isFiltered = filters.type !== "all" || filters.privacy !== "all" || filters.search !== "";
 
   return (
-    <main className="flex-1 overflow-y-auto px-6 py-5 scrollbar-hide min-w-0">
+    <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 pb-28 lg:pb-5 scrollbar-hide min-w-0">
       {loading ? (
         <div className="space-y-6">
           <Skeleton className="w-full h-56" />
@@ -388,7 +388,7 @@ export function RoomsContent({
           {rooms.length === 0 ? (
             <Empty label="No rooms match your filters." onCreateRoom={onCreateRoom} />
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
               {rooms.map((r) => <RoomCard key={r.id} room={r} />)}
             </div>
           )}

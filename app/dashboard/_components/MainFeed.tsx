@@ -268,7 +268,7 @@ export function MainFeed({
   onRefresh: () => void;
 }) {
   return (
-    <main className="flex-1 overflow-y-auto px-6 py-5 space-y-7 scrollbar-hide min-w-0">
+    <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 pb-24 md:pb-5 space-y-7 scrollbar-hide min-w-0">
 
       {/* Continue Watching */}
       <section>

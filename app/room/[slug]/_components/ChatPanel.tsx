@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, UserPlus, Pin, Check, BarChart3, Plus, X, CheckCircle2, HelpCircle } from "lucide-react";
+import { Send, UserPlus, Pin, Check, BarChart3, Plus, X, CheckCircle2, HelpCircle, ArrowLeft } from "lucide-react";
 import type { ChatMessage, PollState, QAItem } from "./LiveRoom";
 import type { RoomInfo } from "../page";
 
@@ -38,6 +38,10 @@ interface ChatPanelProps {
   questions:        QAItem[];
   onAskQuestion:    (text: string) => void;
   onMarkAnswered:   (id: string) => void;
+  /** Renders as a full-screen mobile takeover with a close button, instead
+   *  of the fixed-width desktop rail. */
+  mobile?:          boolean;
+  onClose?:         () => void;
 }
 
 /* ── Polls tab ────────────────────────────────────────────────── */
@@ -240,6 +244,7 @@ export function ChatPanel({
   isHost, onReaction, onInvite, invited,
   poll, onCreatePoll, onVotePoll, onEndPoll,
   questions, onAskQuestion, onMarkAnswered,
+  mobile = false, onClose,
 }: ChatPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -254,16 +259,26 @@ export function ChatPanel({
   const unansweredCount = questions.filter((q) => !q.answered).length;
 
   return (
-    <aside className="w-[260px] shrink-0 flex flex-col h-full bg-[#0a0a0c] border-l border-neutral-800/60">
+    <aside className={mobile
+      ? "w-full flex flex-col h-full bg-[#0a0a0c]"
+      : "w-[260px] shrink-0 flex flex-col h-full bg-[#0a0a0c] border-l border-neutral-800/60"}>
 
       {/* header */}
       <div className="px-4 py-3 border-b border-neutral-800/60 shrink-0">
         <div className="flex items-center justify-between mb-0.5">
-          <h3 className="text-sm font-bold text-white font-sans">
-            {activeTab === "chat" ? "Room Chat" : activeTab === "polls" ? "Polls" : "Q&A"}
-          </h3>
+          <div className="flex items-center gap-2 min-w-0">
+            {mobile && (
+              <button onClick={onClose}
+                className="w-7 h-7 -ml-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors shrink-0">
+                <ArrowLeft className="w-3.5 h-3.5 text-neutral-400" />
+              </button>
+            )}
+            <h3 className="text-sm font-bold text-white font-sans truncate">
+              {activeTab === "chat" ? "Room Chat" : activeTab === "polls" ? "Polls" : "Q&A"}
+            </h3>
+          </div>
           <button title={invited ? "Link copied!" : "Copy invite link"} onClick={onInvite}
-            className="w-6 h-6 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors">
+            className="w-6 h-6 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors shrink-0">
             {invited
               ? <Check className="w-3 h-3 text-emerald-400" />
               : <UserPlus className="w-3 h-3 text-neutral-400" />}

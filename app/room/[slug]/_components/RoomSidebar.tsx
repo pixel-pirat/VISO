@@ -19,39 +19,48 @@ interface RoomSidebarProps {
   lkConnected:   boolean;
   onInvite:      () => void;
   invited:       boolean;
+  /** "rail" (default) is the fixed-width desktop sidebar; "sheet" fills its
+   *  mobile bottom-sheet container instead and skips the "back to rooms"
+   *  link, which would otherwise navigate away from an active call. */
+  variant?: "rail" | "sheet";
 }
 
-export function RoomSidebar({ roomInfo, participants, isHost, currentUserId, lkConnected, onInvite, invited }: RoomSidebarProps) {
+export function RoomSidebar({ roomInfo, participants, isHost, currentUserId, lkConnected, onInvite, invited, variant = "rail" }: RoomSidebarProps) {
   const audioCount = participants.filter((p) => !p.isMuted).length;
+  const isSheet = variant === "sheet";
 
   return (
-    <aside className="w-[200px] shrink-0 flex flex-col h-full bg-[#0a0a0c] border-r border-neutral-800/60 overflow-hidden">
-      {/* back link + room info */}
-      <div className="p-3 border-b border-neutral-800/60 shrink-0">
-        <Link href={`/dashboard/rooms/${roomInfo.slug}`}
-          className="flex items-center gap-1 text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors font-sans mb-3">
-          <ChevronLeft className="w-3 h-3" /> Back to Rooms
-        </Link>
+    <aside className={isSheet
+      ? "w-full flex flex-col h-full bg-transparent overflow-hidden"
+      : "w-[200px] shrink-0 flex flex-col h-full bg-[#0a0a0c] border-r border-neutral-800/60 overflow-hidden"}>
+      {/* back link + room info — desktop rail only */}
+      {!isSheet && (
+        <div className="p-3 border-b border-neutral-800/60 shrink-0">
+          <Link href={`/dashboard/rooms/${roomInfo.slug}`}
+            className="flex items-center gap-1 text-[10px] text-neutral-500 hover:text-neutral-300 transition-colors font-sans mb-3">
+            <ChevronLeft className="w-3 h-3" /> Back to Rooms
+          </Link>
 
-        {/* cover + title */}
-        <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-neutral-800 mb-2">
-          {roomInfo.coverUrl
-            ? <img src={roomInfo.coverUrl} alt="" className="w-full h-full object-cover opacity-80" />  // eslint-disable-line @next/next/no-img-element
-            : <div className="w-full h-full bg-linear-to-br from-violet-900 to-indigo-950 flex items-center justify-center">
-                <Video className="w-6 h-6 text-neutral-600" />
-              </div>}
-          {roomInfo.status === "LIVE" && (
-            <span className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 bg-red-500 rounded text-white text-[8px] font-bold font-sans">
-              <span className="w-1 h-1 rounded-full bg-white animate-pulse" /> LIVE
-            </span>
+          {/* cover + title */}
+          <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-neutral-800 mb-2">
+            {roomInfo.coverUrl
+              ? <img src={roomInfo.coverUrl} alt="" className="w-full h-full object-cover opacity-80" />  // eslint-disable-line @next/next/no-img-element
+              : <div className="w-full h-full bg-linear-to-br from-violet-900 to-indigo-950 flex items-center justify-center">
+                  <Video className="w-6 h-6 text-neutral-600" />
+                </div>}
+            {roomInfo.status === "LIVE" && (
+              <span className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 bg-red-500 rounded text-white text-[8px] font-bold font-sans">
+                <span className="w-1 h-1 rounded-full bg-white animate-pulse" /> LIVE
+              </span>
+            )}
+          </div>
+
+          <p className="text-xs font-bold text-white font-sans leading-tight">{roomInfo.name}</p>
+          {roomInfo.contentTitle && (
+            <p className="text-[10px] text-neutral-500 font-sans mt-0.5">{roomInfo.contentTitle}</p>
           )}
         </div>
-
-        <p className="text-xs font-bold text-white font-sans leading-tight">{roomInfo.name}</p>
-        {roomInfo.contentTitle && (
-          <p className="text-[10px] text-neutral-500 font-sans mt-0.5">{roomInfo.contentTitle}</p>
-        )}
-      </div>
+      )}
 
       {/* participants list */}
       <div className="flex-1 overflow-y-auto scrollbar-hide p-3 space-y-1">
