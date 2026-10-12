@@ -45,9 +45,10 @@ export const auth = betterAuth({
     database: {
       generateId: "uuid",
     },
-    // Disable CSRF/origin check — we run behind Vercel's edge which handles
-    // request validation. Without this, any env var with a wrong path causes 403.
-    disableCSRFCheck: true,
+    // The 403s this used to cause were from unnormalised origin env vars
+    // (paths/trailing slashes), fixed above by toOrigin() — so CSRF can stay
+    // enabled in production. Still off in dev since the local port can vary.
+    disableCSRFCheck: process.env.NODE_ENV === "development",
   },
 
   emailAndPassword: {
