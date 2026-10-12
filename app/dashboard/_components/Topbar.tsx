@@ -69,6 +69,7 @@ export function Topbar({ user, onCreateRoom, searchValue, onSearchChange }: Topb
         <button
           onClick={() => router.push("/dashboard/rooms")}
           title="Search"
+          aria-label="Search rooms"
           className="sm:hidden w-8 h-8 rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center transition-colors shrink-0"
         >
           <Search className="w-4 h-4 text-neutral-400" />
@@ -76,6 +77,7 @@ export function Topbar({ user, onCreateRoom, searchValue, onSearchChange }: Topb
         <Link
           href="/dashboard/notifications"
           title="Notifications"
+          aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : "Notifications"}
           className="w-8 h-8 rounded-lg bg-neutral-800/60 hover:bg-neutral-700/60 flex items-center justify-center transition-colors relative shrink-0"
         >
           <Bell className="w-4 h-4 text-neutral-400" />
@@ -88,6 +90,7 @@ export function Topbar({ user, onCreateRoom, searchValue, onSearchChange }: Topb
         <button
           onClick={onCreateRoom ?? (() => router.push("/dashboard/rooms?create=1"))}
           title="Create Room"
+          aria-label="Create room"
           className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-xs font-bold text-white transition-colors shadow-lg shadow-violet-500/20 font-sans shrink-0"
         >
           <Plus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Create Room</span>

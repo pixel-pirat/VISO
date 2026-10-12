@@ -405,6 +405,7 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
                       const playing = !(videoRef.current?.paused ?? true);
                       playing ? pause() : play();
                     }}
+                    aria-label={isPlaying ? "Pause" : "Play"}
                     className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all"
                   >
                     {isPlaying
@@ -412,7 +413,7 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
                       : <Play  className="w-4 h-4 text-white fill-white ml-0.5" />}
                   </button>
                 ) : (
-                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center" aria-hidden="true">
                     {isPlaying
                       ? <Pause className="w-4 h-4 text-neutral-500" />
                       : <Play  className="w-4 h-4 text-neutral-500 ml-0.5" />}
@@ -421,11 +422,11 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
 
                 {/* Skip — host only */}
                 {isHost && <>
-                  <button onClick={(e) => { e.stopPropagation(); skip(-10); }}
+                  <button onClick={(e) => { e.stopPropagation(); skip(-10); }} aria-label="Rewind 10 seconds"
                     className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all" title="-10s">
                     <RotateCcw className="w-3.5 h-3.5 text-white" />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); skip(10); }}
+                  <button onClick={(e) => { e.stopPropagation(); skip(10); }} aria-label="Forward 10 seconds"
                     className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all" title="+10s">
                     <RotateCw className="w-3.5 h-3.5 text-white" />
                   </button>
@@ -440,6 +441,7 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
                     v.muted = !v.muted;
                     setMuted(v.muted);
                   }}
+                  aria-label={muted || volume === 0 ? "Unmute" : "Mute"}
                   className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all"
                 >
                   {muted || volume === 0
@@ -466,6 +468,7 @@ export function VideoPlayer({ playbackState, queue, isHost, onControl, onVideoRe
                   onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
                   className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/25 active:scale-90 flex items-center justify-center transition-all"
                   title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+                  aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
                 >
                   {isFullscreen
                     ? <Minimize2 className="w-3.5 h-3.5 text-white" />

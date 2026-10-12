@@ -30,7 +30,7 @@ function CtrlBtn({
   disabled?: boolean; icon: React.ElementType; label: string;
 }) {
   return (
-    <button onClick={onClick} disabled={disabled} title={title}
+    <button onClick={onClick} disabled={disabled} title={title} aria-label={title}
       className={`shrink-0 flex flex-col items-center gap-1 px-2.5 sm:px-4 py-2 rounded-xl transition-all group ${
         danger    ? "text-red-400 hover:bg-red-500/20"
         : active  ? "text-white bg-neutral-700"

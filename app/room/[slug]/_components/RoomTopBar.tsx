@@ -51,38 +51,39 @@ export function RoomTopBar({
       {/* right — actions */}
       <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
         {/* Mobile-only: open participants / chat sheets */}
-        <button onClick={onOpenPeople} title="Participants"
+        <button onClick={onOpenPeople} title="Participants" aria-label="Participants"
           className="md:hidden relative w-8 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors">
           <Users className="w-3.5 h-3.5 text-neutral-400" />
           <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 bg-violet-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center font-sans">
             {participantCount > 99 ? "99+" : participantCount}
           </span>
         </button>
-        <button onClick={onOpenChat} title="Chat"
+        <button onClick={onOpenChat} title="Chat" aria-label="Open chat"
           className="md:hidden w-8 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors">
           <MessageSquare className="w-3.5 h-3.5 text-neutral-400" />
         </button>
 
-        <button onClick={onInvite}
+        <button onClick={onInvite} aria-label={invited ? "Invite link copied" : "Copy invite link"}
           className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-xs font-semibold text-neutral-300 hover:text-white transition-colors font-sans">
           {invited
             ? <><Check className="w-3.5 h-3.5 text-emerald-400" /> <span className="hidden sm:inline">Copied!</span></>
             : <><UserPlus className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Invite</span></>}
         </button>
         {isHost && (
-          <Link href={`/dashboard/rooms/${roomInfo.slug}`} title="Room settings"
+          <Link href={`/dashboard/rooms/${roomInfo.slug}`} title="Room settings" aria-label="Room settings"
             className="w-7 h-7 sm:w-7 sm:h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors shrink-0">
             <Settings className="w-3.5 h-3.5 text-neutral-400" />
           </Link>
         )}
         <button onClick={onToggleTheatre}
           className="hidden sm:flex w-7 h-7 rounded-lg bg-neutral-800 hover:bg-neutral-700 items-center justify-center transition-colors"
-          title={theatreMode ? "Exit Theatre Mode" : "Theatre Mode"}>
+          title={theatreMode ? "Exit Theatre Mode" : "Theatre Mode"}
+          aria-label={theatreMode ? "Exit Theatre Mode" : "Theatre Mode"}>
           {theatreMode
             ? <Minimize2 className="w-3.5 h-3.5 text-neutral-400" />
             : <Maximize2 className="w-3.5 h-3.5 text-neutral-400" />}
         </button>
-        <button onClick={onLeave}
+        <button onClick={onLeave} aria-label="Leave room"
           className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-red-600 hover:bg-red-500 rounded-xl text-xs font-bold text-white transition-colors font-sans shadow-lg shadow-red-500/20">
           <LogOut className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Leave Room</span>
         </button>

@@ -27,6 +27,7 @@ function NavItem({
     <Link
       href={href}
       title={collapsed ? label : undefined}
+      aria-label={collapsed ? label : undefined}
       className={`flex items-center gap-3 rounded-lg text-sm font-medium transition-all font-sans group relative
         ${collapsed ? "justify-center px-0 py-2.5 mx-1" : "px-3 py-2"}
         ${active
@@ -163,6 +164,7 @@ export function Sidebar({ user }: { user: User }) {
             onClick={toggle}
             className={`w-6 h-6 rounded-md bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors ${collapsed ? "absolute left-[46px] top-4 z-10 shadow-lg border border-neutral-700" : ""}`}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed
               ? <ChevronRight className="w-3.5 h-3.5 text-neutral-400" />
@@ -200,6 +202,7 @@ export function Sidebar({ user }: { user: User }) {
         <button
           onClick={handleSignOut}
           title={collapsed ? `Sign out (${user.name})` : "Click to sign out"}
+          aria-label={`Sign out (${user.name})`}
           className={`flex items-center border-t border-neutral-800/60 hover:bg-neutral-800/40 transition-colors w-full group
             ${collapsed ? "justify-center py-3 px-0" : "gap-3 px-4 py-3 text-left"}`}
         >
