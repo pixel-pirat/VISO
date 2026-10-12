@@ -2,13 +2,8 @@
 
 import { useRef, useEffect } from "react";
 import { Mic, MicOff, MoreHorizontal } from "lucide-react";
+import { pickAvatarGradient as ag } from "@/lib/avatar-color";
 import type { RoomParticipant } from "./LiveRoom";
-
-const AVATAR_G = ["from-violet-500 to-fuchsia-500","from-blue-500 to-cyan-500","from-emerald-500 to-teal-500","from-orange-500 to-rose-500","from-pink-500 to-fuchsia-500"];
-function ag(id: string) {
-  let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_G[h % AVATAR_G.length];
-}
 
 function ParticipantTile({ participant, isHost }: { participant: RoomParticipant; isHost: boolean }) {
   const videoRef = useRef<HTMLVideoElement>(null);

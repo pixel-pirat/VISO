@@ -7,23 +7,8 @@ import {
   ChevronLeft, Radio, Copy, Check,
 } from "lucide-react";
 import Link from "next/link";
+import { pickRoomGradient as grad, pickAvatarGradient as avatarG } from "@/lib/avatar-color";
 import type { RoomDetailData } from "../_types";
-
-const GRADIENTS = [
-  "from-violet-900 to-indigo-950", "from-purple-900 to-violet-950",
-  "from-blue-900 to-sky-950",      "from-rose-900 to-pink-950",
-  "from-teal-900 to-emerald-950",  "from-orange-900 to-amber-950",
-];
-function grad(id: string) {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return GRADIENTS[h % GRADIENTS.length];
-}
-const AVATAR_G = ["from-violet-500 to-fuchsia-500","from-blue-500 to-cyan-500","from-emerald-500 to-teal-500","from-orange-500 to-rose-500","from-pink-500 to-fuchsia-500"];
-function avatarG(id: string) {
-  let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_G[h % AVATAR_G.length];
-}
 
 function commLabel(room: RoomDetailData) {
   const on = [room.commChat && "Chat", room.commAudio && "Audio", room.commVideo && "Video"].filter(Boolean) as string[];

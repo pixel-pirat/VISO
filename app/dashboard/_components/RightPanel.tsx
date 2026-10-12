@@ -3,20 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { MessageCircle, UserPlus } from "lucide-react";
+import { pickAvatarGradient as pickAvatar } from "@/lib/avatar-color";
 import type { AppNotification, FriendshipWithUsers } from "../_types/dashboard";
-
-const AVATAR_GRADIENTS = [
-  "from-violet-500 to-fuchsia-500",
-  "from-blue-500 to-cyan-500",
-  "from-emerald-500 to-teal-500",
-  "from-orange-500 to-rose-500",
-  "from-pink-500 to-fuchsia-500",
-];
-function pickAvatar(seed: string) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length];
-}
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();

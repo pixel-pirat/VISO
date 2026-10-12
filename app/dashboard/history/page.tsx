@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { Loader2, Clock, Play, Radio, Users } from "lucide-react";
 import { Sidebar } from "../_components/Sidebar";
 import { Topbar } from "../_components/Topbar";
+import { pickRoomGradient as grad } from "@/lib/avatar-color";
 
 type HistoryEntry = {
   id: string;
@@ -39,9 +40,6 @@ function fmtProgress(current: number, duration: number | null) {
   if (!duration || duration === 0) return null;
   return Math.min(100, Math.round((current / duration) * 100));
 }
-
-const GRADIENTS = ["from-violet-900 to-indigo-950","from-purple-900 to-violet-950","from-blue-900 to-sky-950","from-rose-900 to-pink-950","from-teal-900 to-emerald-950","from-orange-900 to-amber-950"];
-function grad(id: string) { let h=0; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))>>>0; return GRADIENTS[h%GRADIENTS.length]; }
 
 export default function HistoryPage() {
   const router = useRouter();

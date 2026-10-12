@@ -6,6 +6,7 @@ import {
   Users, Lock, Globe, CheckCircle2, Play,
   ChevronLeft, ChevronRight, Plus,
 } from "lucide-react";
+import { pickRoomGradient as grad } from "@/lib/avatar-color";
 import type { RoomFilters } from "../page";
 
 type RoomUser = { id: string; name: string | null; username: string | null; image: string | null };
@@ -33,22 +34,6 @@ type Room = {
     } | null;
   } | null;
 };
-
-const GRADIENTS = [
-  "from-violet-900 via-indigo-900 to-neutral-950",
-  "from-purple-900 via-violet-900 to-neutral-950",
-  "from-blue-900 via-sky-900 to-neutral-950",
-  "from-rose-900 via-pink-900 to-neutral-950",
-  "from-teal-900 via-emerald-900 to-neutral-950",
-  "from-orange-900 via-amber-900 to-neutral-950",
-  "from-fuchsia-900 via-purple-900 to-neutral-950",
-  "from-indigo-900 via-blue-900 to-neutral-950",
-];
-function grad(id: string) {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return GRADIENTS[h % GRADIENTS.length];
-}
 
 function progress(room: Room) {
   const d = room.playbackState?.roomContent?.content.duration ?? 0;

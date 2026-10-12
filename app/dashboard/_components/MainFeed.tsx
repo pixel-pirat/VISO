@@ -3,38 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Play, ChevronRight, Radio, Users, Lock, CheckCircle2, Flame, Globe } from "lucide-react";
+import { pickRoomGradient as pickGradient, pickAvatarGradient as pickAvatar } from "@/lib/avatar-color";
 import type { DashboardData, LiveRoom, ContinueItem, TrendingRoom, FriendActivity } from "../_types/dashboard";
 
 type User = { id: string; name: string | null };
-
-const GRADIENTS = [
-  "from-violet-900 to-indigo-950",
-  "from-purple-900 to-violet-950",
-  "from-indigo-900 to-blue-950",
-  "from-blue-900 to-sky-950",
-  "from-teal-900 to-emerald-950",
-  "from-rose-900 to-pink-950",
-  "from-orange-900 to-amber-950",
-  "from-fuchsia-900 to-purple-950",
-];
-function pickGradient(seed: string) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return GRADIENTS[h % GRADIENTS.length];
-}
-
-const AVATAR_GRADIENTS = [
-  "from-violet-500 to-fuchsia-500",
-  "from-blue-500 to-cyan-500",
-  "from-emerald-500 to-teal-500",
-  "from-orange-500 to-rose-500",
-  "from-pink-500 to-fuchsia-500",
-];
-function pickAvatar(seed: string) {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  return AVATAR_GRADIENTS[h % AVATAR_GRADIENTS.length];
-}
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();

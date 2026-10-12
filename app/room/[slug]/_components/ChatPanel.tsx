@@ -1,15 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, UserPlus, Pin, Check, BarChart3, Plus, X, CheckCircle2, HelpCircle, ArrowLeft } from "lucide-react";
+import { Send, UserPlus, Check, BarChart3, Plus, X, CheckCircle2, HelpCircle, ArrowLeft } from "lucide-react";
+import { pickAvatarGradient as ag } from "@/lib/avatar-color";
 import type { ChatMessage, PollState, QAItem } from "./LiveRoom";
 import type { RoomInfo } from "../page";
-
-const AVATAR_G = ["from-violet-500 to-fuchsia-500","from-blue-500 to-cyan-500","from-emerald-500 to-teal-500","from-orange-500 to-rose-500","from-pink-500 to-fuchsia-500"];
-function ag(id: string) {
-  let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_G[h % AVATAR_G.length];
-}
 
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -268,7 +263,7 @@ export function ChatPanel({
         <div className="flex items-center justify-between mb-0.5">
           <div className="flex items-center gap-2 min-w-0">
             {mobile && (
-              <button onClick={onClose}
+              <button onClick={onClose} aria-label="Close"
                 className="w-7 h-7 -ml-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors shrink-0">
                 <ArrowLeft className="w-3.5 h-3.5 text-neutral-400" />
               </button>
@@ -277,7 +272,7 @@ export function ChatPanel({
               {activeTab === "chat" ? "Room Chat" : activeTab === "polls" ? "Polls" : "Q&A"}
             </h3>
           </div>
-          <button title={invited ? "Link copied!" : "Copy invite link"} onClick={onInvite}
+          <button title={invited ? "Link copied!" : "Copy invite link"} aria-label={invited ? "Invite link copied" : "Copy invite link"} onClick={onInvite}
             className="w-6 h-6 rounded-lg bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center transition-colors shrink-0">
             {invited
               ? <Check className="w-3 h-3 text-emerald-400" />
@@ -289,14 +284,6 @@ export function ChatPanel({
 
       {activeTab === "chat" && (
         <>
-          {/* pinned message */}
-          <div className="mx-3 mt-3 mb-1 px-3 py-2 bg-violet-500/10 border border-violet-500/20 rounded-xl shrink-0">
-            <p className="text-[9px] font-bold text-violet-400 uppercase tracking-wider font-sans flex items-center gap-1 mb-1">
-              <Pin className="w-2.5 h-2.5" /> Pinned Message
-            </p>
-            <p className="text-[10px] text-neutral-300 font-sans">No spoilers! Let everyone enjoy the show 🎬</p>
-          </div>
-
           {/* messages */}
           <div className="flex-1 overflow-y-auto scrollbar-hide px-3 py-2 space-y-3">
             {messages.map((msg) => {
@@ -326,7 +313,7 @@ export function ChatPanel({
           {/* quick reactions — sent to everyone via the data channel */}
           <div className="px-3 py-2 border-t border-neutral-800/60 shrink-0 flex items-center justify-between">
             {QUICK_REACTIONS.map((e) => (
-              <button key={e} onClick={() => onReaction(e)} title="Send reaction"
+              <button key={e} onClick={() => onReaction(e)} title={`Send ${e}`} aria-label={`Send ${e} reaction`}
                 className="text-base hover:scale-125 transition-transform">{e}</button>
             ))}
           </div>

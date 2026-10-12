@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { Loader2, Download, Play, Film, Radio, ExternalLink } from "lucide-react";
 import { Sidebar } from "../_components/Sidebar";
 import { Topbar } from "../_components/Topbar";
+import { pickRoomGradient as grad } from "@/lib/avatar-color";
 
 type SavedContent = {
   id: string; title: string; url: string; type: string;
@@ -32,9 +33,6 @@ function timeAgo(iso: string) {
   if (days < 7)  return `${days} days ago`;
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
-
-const GRADIENTS = ["from-violet-900 to-indigo-950","from-purple-900 to-violet-950","from-blue-900 to-sky-950","from-rose-900 to-pink-950","from-teal-900 to-emerald-950"];
-function grad(id: string) { let h=0; for(let i=0;i<id.length;i++) h=(h*31+id.charCodeAt(i))>>>0; return GRADIENTS[h%GRADIENTS.length]; }
 
 const TYPE_LABEL: Record<string, string> = {
   HLS: "HLS Stream", MP4: "MP4 Video", YOUTUBE: "YouTube", TWITCH: "Twitch",
